@@ -63,7 +63,7 @@ def get_vessel_data(engine, vessel_name, year):
         COALESCE((SUM("FUEL_CONSUMPTION_LPG") - SUM("FC_FUEL_CONSUMPTION_LPG")) * 3.00, 0) + 
         COALESCE((SUM("FUEL_CONSUMPTION_METHANOL") - SUM("FC_FUEL_CONSUMPTION_METHANOL")) * 1.375, 0) + 
         COALESCE((SUM("FUEL_CONSUMPTION_ETHANOL") - SUM("FC_FUEL_CONSUMPTION_ETHANOL")) * 1.913, 0) AS "CO2Emission",
-        t2."deadweight",
+        t2."deadweight" AS "capacity",
         t2."vessel_type",
         ROUND(CAST(SUM("DISTANCE_TRAVELLED_ACTUAL") * t2."deadweight" AS NUMERIC), 2) AS "Transportwork",
         CASE 
@@ -220,13 +220,13 @@ def main():
         if not df.empty:
             vessel_type = df['vessel_type'].iloc[0]
             imo_ship_type = VESSEL_TYPE_MAPPING.get(vessel_type)
-            deadweight = df['deadweight'].iloc[0]
+            capacity = df['capacity'].iloc[0]  # Use 'capacity' instead of 'deadweight'
             attained_aer = df['Attained_AER'].iloc[0]
 
             if imo_ship_type and attained_aer is not None:
-                reference_cii = calculate_reference_cii(deadweight, imo_ship_type)
+                reference_cii = calculate_reference_cii(capacity, imo_ship_type)
                 required_cii = calculate_required_cii(reference_cii, year)
-                cii_rating = calculate_cii_rating(attained_aer, required_cii, imo_ship_type)
+                cii_rating = calculate_cii_rating(attained_aer, required_cii, imo_ship_type, capacity)
 
                 # Display results
                 st.subheader(f'CII Results for Year {year}')
