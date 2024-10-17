@@ -221,4 +221,171 @@ def calculate_cii_rating(attained_cii, required_cii, ship_type, capacity):
     if ship_type is None:
         raise ValueError("Ship type is None, cannot proceed with CII rating calculation.")
 
-    ship_params = dd_vectors
+    ship_params = dd_vectors.get(ship_type.lower())
+    if not ship_params:
+        raise ValueError(f"Unknown ship type: {ship_type}")
+
+    for param in ship_params:
+        if capacity <= param['capacity_threshold']:
+            d1, d2, d3, d4 = param['d']
+            break
+    else:
+        raise ValueError(f"Capacity {capacity} is out of range for ship type {ship_type}")
+
+    superior = np.exp(d1) * required_cii
+    lower = np.exp(d2) * required_cii
+    upper = np.exp(d3) * required_cii
+    inferior = np.exp(d4) * required_cii
+
+    if attained_cii <= superior:
+        return 'A'
+    elif attained_cii <= lower:
+        return 'B'
+    elif attained_cii <= upper:
+        return 'C'
+    elif attained_cii <= inferior:
+        return 'D'
+    else:
+        return 'E'
+
+@st.cache_data
+def load_world_ports():
+    return pd.read_csv("UpdatedPub150.csv")
+
+world_ports_data = load_world_ports()
+
+def world_port_index(port_to_match):
+    best_match = process.extractOne(port_to_match, world_ports_data['Main Port Name'])
+    return world_ports_data[world_ports_data['Main Port Name'] == best_match[0]].iloc[0]
+
+def project_cii(current_cii, years_ahead=5):
+    projected_cii = []
+    current_year = date.today().year
+    for i in range(years_ahead):
+        year = current_year + i
+        reduction_factor = 1 - (0.02 * i)  # 2% reduction per year
+        projected_cii.append({
+            'Year': year,
+            'Projected CII': current_cii * reduction_factor
+        })
+    return pd.DataFrame(projected_cii)
+
+def plot_route(ports):
+    m = folium.Map(location=[0, 0], zoom_start=2, tiles="CartoDB positron")
+    
+    if len(ports) >= 2 and all(ports):
+        coordinates = []
+        for i in range(len(ports) - 1):
+            try:
+                start_port = world_port_index(ports[i])
+                end_port = world_port_index(ports[i+1])
+                start_coords = [float(start_port['Latitude']), float(start_port['Longitude'])]
+                end_coords = [float(end_port['Latitude']), float(end_port['Longitude'])]
+                
+                folium.Marker(start_coords, popup=ports[i], icon=folium.Icon(color='blue', icon='ship', prefix='fa')).add_to(m)
+                if i == len(ports) - 2:
+                    folium.Marker(end_coords, popup=ports[i+1], icon=folium.Icon(color='red', icon='flag-checkered', prefix='fa')).add_to(m)
+                
+                route = sr.searoute(start_coords[::-1], end_coords[::-1])
+                folium.PolyLine(locations=[list(reversed(coord)) for coord in route['geometry']['coordinates']], 
+                                color="#3B82F6", weight=3, opacity=0.8).add_to(m)
+                
+                coordinates.extend([start_coords, end_coords])
+            except Exception as e:
+                st.error(f"Error plotting route for {ports[i]} to {ports[i+1]}: {str(e)}")
+        
+        if coordinates:
+            m.fit_bounds(coordinates)
+    
+    return m
+
+def route_distance(origin, destination):
+    try:
+        origin_port = world_port_index(origin)
+        destination_port = world_port_index(destination)
+        
+        origin_coords = [float(origin_port['Longitude']), float(origin_port['Latitude'])]
+        destination_coords = [float(destination_port['Longitude']), float(destination_port['Latitude'])]
+        
+        sea_route = sr.searoute(origin_coords, destination_coords, units="naut")
+        return int(sea_route['properties']['length'])
+    except Exception as e:
+        st.error(f"Error calculating distance between {origin} and {destination}: {str(e)}")
+        return 0
+
+def main():
+    st.title('🚢 CII Calculator')
+
+    # Get database connection
+    engine = get_db_engine()
+
+    # Create two columns for the main layout
+    col1, col2 = st.columns([3, 2])
+
+    with col1:
+        st.subheader("Vessel CII Calculation")
+        vessel_name = st.text_input("Enter Vessel Name")
+        year = st.number_input('Year for CII Calculation', min_value=2023, max_value=date.today().year, value=date.today().year)
+        
+        if st.button('Calculate CII', key='calculate_cii'):
+            if vessel_name:
+                with st.spinner('Calculating CII...'):
+                    df = get_vessel_data(engine, vessel_name, year)
+                    if not df.empty:
+                        vessel_type = df['vessel_type'].iloc[0]
+                        imo_ship_type = VESSEL_TYPE_MAPPING.get(vessel_type)
+                        capacity = df['capacity'].iloc[0]
+                        attained_aer = df['Attained_AER'].iloc[0]
+
+                        if imo_ship_type and attained_aer is not None:
+                            reference_cii = calculate_reference_cii(capacity, imo_ship_type)
+                            required_cii = calculate_required_cii(reference_cii, year)
+                            cii_rating = calculate_cii_rating(attained_aer, required_cii, imo_ship_type, capacity)
+                            
+                            st.success("CII Calculation Complete!")
+                            st.write(f"**Vessel Name:** {vessel_name}")
+                            st.write(f"**Vessel Type:** {vessel_type}")
+                            
+                            metric_col1, metric_col2, metric_col3 = st.columns(3)
+                            metric_col1.metric('Attained AER', f'{attained_aer:.4f}')
+                            metric_col2.metric('Required CII', f'{required_cii:.4f}')
+                            metric_col3.metric('CII Rating', cii_rating)
+
+                            st.subheader('CII Projection')
+                            projection = project_cii(attained_aer)
+                            st.line_chart(projection.set_index('Year'))
+                        else:
+                            if imo_ship_type is None:
+                                st.error(f"The vessel type '{vessel_type}' is not supported for CII calculations.")
+                            if attained_aer is None:
+                                st.error("Unable to calculate Attained AER. Please check the vessel's data.")
+                    else:
+                        st.error(f"No data found for vessel {vessel_name} in year {year}")
+
+    with col2:
+        st.subheader("Route Planning")
+        num_ports = st.number_input('Number of Ports', min_value=2, max_value=10, value=2)
+        ports = []
+        for i in range(num_ports):
+            port = st.text_input(f'Port {i+1}')
+            ports.append(port)
+
+        if st.button('Plan Route', key='plan_route'):
+            with st.spinner('Planning route...'):
+                m = plot_route(ports)
+                st_folium(m, width=None, height=400)
+
+                if len(ports) >= 2 and all(ports):
+                    st.subheader('Distance Calculations')
+                    total_distance = 0
+                    for i in range(len(ports) - 1):
+                        distance = route_distance(ports[i], ports[i+1])
+                        total_distance += distance
+                        st.write(f"**{ports[i]} to {ports[i+1]}:** {distance} nautical miles")
+                    st.write(f"**Total distance:** {total_distance} nautical miles")
+
+                    # Here you would add the logic to calculate CII based on the route
+                    st.info("CII projection based on route would be displayed here")
+
+if __name__ == '__main__':
+    main()
