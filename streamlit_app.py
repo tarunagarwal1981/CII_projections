@@ -1,4 +1,4 @@
-import streamlit as st
+ELimport streamlit as st
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine, text
@@ -83,7 +83,7 @@ def get_vessel_data(engine, vessel_name, year):
     FROM 
         sf_consumption_logs AS t1
     LEFT JOIN 
-        vessel_particulars AS t2 ON t1.vessel_imo = t2.vessel_imo
+        vessel_particulars AS t2 ON t1.VESSEL_IMO = t2.vessel_imo
     WHERE 
         t1.vessel_name = :vessel_name
         AND EXTRACT(YEAR FROM report_date) = :year
