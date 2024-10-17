@@ -232,8 +232,16 @@ def calculate_cii_rating(attained_cii, required_cii, ship_type, capacity):
     else:
         return 'E'
 
+@st.cache_data
+def load_world_ports():
+    return pd.read_csv("UpdatedPub150.csv")
 
-# New function for CII projection
+world_ports_data = load_world_ports()
+
+def world_port_index(port_to_match):
+    best_match = process.extractOne(port_to_match, world_ports_data['Main Port Name'])
+    return world_ports_data[world_ports_data['Main Port Name'] == best_match[0]].iloc[0]
+
 def project_cii(current_cii, years_ahead=5):
     projected_cii = []
     current_year = date.today().year
@@ -246,31 +254,48 @@ def project_cii(current_cii, years_ahead=5):
         })
     return pd.DataFrame(projected_cii)
 
-# Function to plot route on map
 def plot_route(ports):
     m = folium.Map(location=[0, 0], zoom_start=2)
     
-    if len(ports) >= 2:
+    if len(ports) >= 2 and all(ports):
         coordinates = []
         for i in range(len(ports) - 1):
-            start_port = world_port_index(ports[i])
-            end_port = world_port_index(ports[i+1])
-            start_coords = [float(start_port['Latitude']), float(start_port['Longitude'])]
-            end_coords = [float(end_port['Latitude']), float(end_port['Longitude'])]
-            
-            folium.Marker(start_coords, popup=ports[i]).add_to(m)
-            if i == len(ports) - 2:
-                folium.Marker(end_coords, popup=ports[i+1]).add_to(m)
-            
-            route = sr.searoute(start_coords[::-1], end_coords[::-1])
-            folium.PolyLine(locations=[list(reversed(coord)) for coord in route['geometry']['coordinates']], 
-                            color="red", weight=2, opacity=0.8).add_to(m)
-            
-            coordinates.extend([start_coords, end_coords])
+            try:
+                start_port = world_port_index(ports[i])
+                end_port = world_port_index(ports[i+1])
+                start_coords = [float(start_port['Latitude']), float(start_port['Longitude'])]
+                end_coords = [float(end_port['Latitude']), float(end_port['Longitude'])]
+                
+                folium.Marker(start_coords, popup=ports[i]).add_to(m)
+                if i == len(ports) - 2:
+                    folium.Marker(end_coords, popup=ports[i+1]).add_to(m)
+                
+                route = sr.searoute(start_coords[::-1], end_coords[::-1])
+                folium.PolyLine(locations=[list(reversed(coord)) for coord in route['geometry']['coordinates']], 
+                                color="red", weight=2, opacity=0.8).add_to(m)
+                
+                coordinates.extend([start_coords, end_coords])
+            except Exception as e:
+                st.error(f"Error plotting route for {ports[i]} to {ports[i+1]}: {str(e)}")
         
-        m.fit_bounds(coordinates)
+        if coordinates:
+            m.fit_bounds(coordinates)
     
     return m
+
+def route_distance(origin, destination):
+    try:
+        origin_port = world_port_index(origin)
+        destination_port = world_port_index(destination)
+        
+        origin_coords = [float(origin_port['Longitude']), float(origin_port['Latitude'])]
+        destination_coords = [float(destination_port['Longitude']), float(destination_port['Latitude'])]
+        
+        sea_route = sr.searoute(origin_coords, destination_coords, units="naut")
+        return int(sea_route['properties']['length'])
+    except Exception as e:
+        st.error(f"Error calculating distance between {origin} and {destination}: {str(e)}")
+        return 0
 
 def main():
     st.title('🚢 CII Calculator')
@@ -340,7 +365,7 @@ def main():
         st_folium(m, width=800, height=400)
 
     # Display distance calculations
-    if len(ports) >= 2:
+    if len(ports) >= 2 and all(ports):
         st.subheader('Distance Calculations')
         total_distance = 0
         for i in range(len(ports) - 1):
