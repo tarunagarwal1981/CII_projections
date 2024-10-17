@@ -2,3 +2,9 @@ streamlit
 pandas
 SQLAlchemy 
 psycopg2-binary
+geopandas
+folium
+streamlit-folium>=0.12.0
+searoute
+fuzzywuzzy
+python-Levenshtein
