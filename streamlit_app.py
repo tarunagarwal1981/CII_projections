@@ -144,7 +144,7 @@ def calculate_required_cii(reference_cii, year):
     reduction_factors = {2023: 0.95, 2024: 0.93, 2025: 0.91, 2026: 0.89}
     return reference_cii * reduction_factors.get(year, 1.0)
 
-def calculate_cii_rating(attained_cii, required_cii, ship_type):
+def calculate_cii_rating(attained_cii, required_cii, ship_type, capacity):
     dd_vectors = {
         'bulk_carrier': [
             {'capacity_threshold': 297000, 'd': [0.86, 0.94, 1.06, 1.18]},
@@ -227,7 +227,6 @@ def main():
                 reference_cii = calculate_reference_cii(capacity, imo_ship_type)
                 required_cii = calculate_required_cii(reference_cii, year)
                 cii_rating = calculate_cii_rating(attained_aer, required_cii, imo_ship_type, capacity)
-
                 # Display results
                 st.subheader(f'CII Results for Year {year}')
                 st.write(f"Vessel Name: {vessel_name}")
