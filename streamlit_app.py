@@ -54,7 +54,7 @@ def get_vessel_data(engine, vessel_name, year):
     query = text("""
     SELECT 
         t1.VESSEL_NAME AS Vessel,
-        t1.VESSEL_IMO as IMO,
+        t1.VESSEL_NAME as IMO,  -- Changed from t1.VESSEL_IMO to t1.VESSEL_NAME
         SUM(DISTANCE_TRAVELLED_ACTUAL) AS total_distance,
         COALESCE((SUM(FUEL_CONSUMPTION_HFO) - SUM(FC_FUEL_CONSUMPTION_HFO)) * 3.114, 0) + 
         COALESCE((SUM(FUEL_CONSUMPTION_LFO) - SUM(FC_FUEL_CONSUMPTION_LFO)) * 3.151, 0) + 
@@ -83,12 +83,12 @@ def get_vessel_data(engine, vessel_name, year):
     FROM 
         sf_consumption_logs AS t1
     LEFT JOIN 
-        vessel_particulars AS t2 ON t1.VESSEL_IMO = t2.vessel_imo
+        vessel_particulars AS t2 ON t1.VESSEL_NAME = t2.vessel_name  -- Changed from t1.VESSEL_IMO = t2.vessel_imo
     WHERE 
         t1.VESSEL_NAME = :vessel_name
         AND EXTRACT(YEAR FROM REPORT_DATE) = :year
     GROUP BY 
-        t1.VESSEL_NAME, t1.VESSEL_IMO, t2.deadweight, t2.vessel_type
+        t1.VESSEL_NAME, t2.deadweight, t2.vessel_type
     """)
     
     try:
