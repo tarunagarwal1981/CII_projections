@@ -53,46 +53,50 @@ def get_db_engine():
 def get_vessel_data(engine, vessel_name, year):
     query = text("""
     SELECT 
-        t1.vessel_name AS Vessel,
-        t1.vessel_imo as IMO,
-        SUM(distance_travelled_actual) AS total_distance,
-        coalesce((SUM(fuel_consumption_hfo) - sum(fc_fuel_consumption_hfo)) * 3.114, 0) + 
-        coalesce((SUM(fuel_consumption_lfo) - sum(fc_fuel_consumption_lfo)) * 3.151, 0) + 
-        coalesce((SUM(fuel_consumption_go_do) - sum(fc_fuel_consumption_go_do)) * 3.206, 0) + 
-        coalesce((SUM(fuel_consumption_lng) - sum(fc_fuel_consumption_lng)) * 2.75, 0) + 
-        coalesce((SUM(fuel_consumption_lpg) - sum(fc_fuel_consumption_lpg)) * 3.00, 0) + 
-        coalesce((SUM(fuel_consumption_methanol) - sum(fc_fuel_consumption_methanol)) * 1.375, 0) + 
-        coalesce((SUM(fuel_consumption_ethanol) - sum(fc_fuel_consumption_ethanol)) * 1.913, 0) as CO2Emission,
+        t1.VESSEL_NAME AS Vessel,
+        t1.VESSEL_IMO as IMO,
+        SUM(DISTANCE_TRAVELLED_ACTUAL) AS total_distance,
+        COALESCE((SUM(FUEL_CONSUMPTION_HFO) - SUM(FC_FUEL_CONSUMPTION_HFO)) * 3.114, 0) + 
+        COALESCE((SUM(FUEL_CONSUMPTION_LFO) - SUM(FC_FUEL_CONSUMPTION_LFO)) * 3.151, 0) + 
+        COALESCE((SUM(FUEL_CONSUMPTION_GO_DO) - SUM(FC_FUEL_CONSUMPTION_GO_DO)) * 3.206, 0) + 
+        COALESCE((SUM(FUEL_CONSUMPTION_LNG) - SUM(FC_FUEL_CONSUMPTION_LNG)) * 2.75, 0) + 
+        COALESCE((SUM(FUEL_CONSUMPTION_LPG) - SUM(FC_FUEL_CONSUMPTION_LPG)) * 3.00, 0) + 
+        COALESCE((SUM(FUEL_CONSUMPTION_METHANOL) - SUM(FC_FUEL_CONSUMPTION_METHANOL)) * 1.375, 0) + 
+        COALESCE((SUM(FUEL_CONSUMPTION_ETHANOL) - SUM(FC_FUEL_CONSUMPTION_ETHANOL)) * 1.913, 0) as CO2Emission,
         t2.deadweight,
         t2.vessel_type,
-        round(SUM(distance_travelled_actual) * t2.deadweight, 2) as Transportwork,
+        ROUND(SUM(DISTANCE_TRAVELLED_ACTUAL) * t2.deadweight, 2) as Transportwork,
         CASE 
-            WHEN round(SUM(distance_travelled_actual) * t2.deadweight, 2) <> 0 
-            THEN round((coalesce((SUM(fuel_consumption_hfo) - sum(fc_fuel_consumption_hfo)) * 3.114, 0) + 
-                        coalesce((SUM(fuel_consumption_lfo) - sum(fc_fuel_consumption_lfo)) * 3.151, 0) + 
-                        coalesce((SUM(fuel_consumption_go_do) - sum(fc_fuel_consumption_go_do)) * 3.206, 0) + 
-                        coalesce((SUM(fuel_consumption_lng) - sum(fc_fuel_consumption_lng)) * 2.75, 0) + 
-                        coalesce((SUM(fuel_consumption_lpg) - sum(fc_fuel_consumption_lpg)) * 3.00, 0) + 
-                        coalesce((SUM(fuel_consumption_methanol) - sum(fc_fuel_consumption_methanol)) * 1.375, 0) + 
-                        coalesce((SUM(fuel_consumption_ethanol) - sum(fc_fuel_consumption_ethanol)) * 1.913, 0)) * 1000000 / 
-                        (SUM(distance_travelled_actual) * t2.deadweight), 2)
+            WHEN ROUND(SUM(DISTANCE_TRAVELLED_ACTUAL) * t2.deadweight, 2) <> 0 
+            THEN ROUND((COALESCE((SUM(FUEL_CONSUMPTION_HFO) - SUM(FC_FUEL_CONSUMPTION_HFO)) * 3.114, 0) + 
+                        COALESCE((SUM(FUEL_CONSUMPTION_LFO) - SUM(FC_FUEL_CONSUMPTION_LFO)) * 3.151, 0) + 
+                        COALESCE((SUM(FUEL_CONSUMPTION_GO_DO) - SUM(FC_FUEL_CONSUMPTION_GO_DO)) * 3.206, 0) + 
+                        COALESCE((SUM(FUEL_CONSUMPTION_LNG) - SUM(FC_FUEL_CONSUMPTION_LNG)) * 2.75, 0) + 
+                        COALESCE((SUM(FUEL_CONSUMPTION_LPG) - SUM(FC_FUEL_CONSUMPTION_LPG)) * 3.00, 0) + 
+                        COALESCE((SUM(FUEL_CONSUMPTION_METHANOL) - SUM(FC_FUEL_CONSUMPTION_METHANOL)) * 1.375, 0) + 
+                        COALESCE((SUM(FUEL_CONSUMPTION_ETHANOL) - SUM(FC_FUEL_CONSUMPTION_ETHANOL)) * 1.913, 0)) * 1000000 / 
+                        (SUM(DISTANCE_TRAVELLED_ACTUAL) * t2.deadweight), 2)
             ELSE NULL
         END as Attained_AER,
-        MIN(report_date) as Startdate,
-        MAX(report_date) as Enddate
+        MIN(REPORT_DATE) as Startdate,
+        MAX(REPORT_DATE) as Enddate
     FROM 
         sf_consumption_logs AS t1
     LEFT JOIN 
-        vessel_particulars AS t2 ON t1.vessel_imo = t2.vessel_imo
+        vessel_particulars AS t2 ON t1.VESSEL_IMO = t2.vessel_imo
     WHERE 
-        t1.vessel_name = :vessel_name
-        AND EXTRACT(YEAR FROM report_date) = :year
+        t1.VESSEL_NAME = :vessel_name
+        AND EXTRACT(YEAR FROM REPORT_DATE) = :year
     GROUP BY 
-        t1.vessel_name, t1.vessel_imo, t2.deadweight, t2.vessel_type
+        t1.VESSEL_NAME, t1.VESSEL_IMO, t2.deadweight, t2.vessel_type
     """)
     
-    df = pd.read_sql(query, engine, params={'vessel_name': vessel_name, 'year': year})
-    return df
+    try:
+        df = pd.read_sql(query, engine, params={'vessel_name': vessel_name, 'year': year})
+        return df
+    except Exception as e:
+        st.error(f"Error executing SQL query: {str(e)}")
+        return pd.DataFrame()
 
 def calculate_reference_cii(capacity, ship_type):
     params = {
