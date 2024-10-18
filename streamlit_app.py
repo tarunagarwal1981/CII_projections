@@ -278,30 +278,27 @@ def main():
     # CII Projections based on route
     st.subheader('CII Projections based on Route')
 
-    # Create a 6-column layout
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    # Create a 2-column layout: left for inputs, right for map
+    left_col, right_col = st.columns([3, 3])
 
-    # Input fields in the first three columns
-    with col1:
+    # Input fields in the left column
+    with left_col:
         speed = st.number_input('Speed (knots)', min_value=0.0, value=12.0, step=0.1)
         daily_foc = st.number_input('Daily FOC (mT/d)', min_value=0.0, value=30.0, step=0.1)
-
-    with col2:
         num_ports = st.number_input('Number of Ports', min_value=2, max_value=10, value=2)
-
-    with col3:
+        
         ports = []
         for i in range(num_ports):
             port = st.text_input(f'Port {i+1}', key=f'port_{i}')
             ports.append(port)
 
-    # Map in the last three columns
-    with col4, col5, col6:
+    # Map in the right column
+    with right_col:
         if len(ports) >= 2 and all(ports):
             m = plot_route(ports)
         else:
             m = folium.Map(location=[0, 0], zoom_start=2)
-        st_folium(m, width=600, height=400)
+        st_folium(m, width=None, height=400)  # width=None allows it to fill the column
 
     # Project CII button and calculations
     if st.button('Project CII'):
