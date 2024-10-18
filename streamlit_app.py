@@ -216,14 +216,14 @@ def plot_route(ports):
 def main():
     st.title('🚢 CII Calculator')
 
-    # User input for vessel name, year and calculate button in a single line with 5 columns
+    # User input for vessel name, year, and calculate button in a single line with 5 columns
     col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
     with col1:
         vessel_name = st.text_input("Enter Vessel Name")
+        calculate_clicked = st.button('Calculate CII')
     with col2:
         year = st.number_input('Year for CII Calculation', min_value=2023, max_value=date.today().year, value=date.today().year)
-    with col3:
-        calculate_clicked = st.button('Calculate CII')
+          
 
     # Get database connection
     engine = get_db_engine()
@@ -236,17 +236,21 @@ def main():
             imo_ship_type = VESSEL_TYPE_MAPPING.get(vessel_type)
             capacity = df['capacity'].iloc[0]
             attained_aer = df['Attained_AER'].iloc[0]
+            total_distance = df['total_distance'].iloc[0]  # Extract total distance
+            co2_emission = df['CO2Emission'].iloc[0]  # Extract CO2 emission
 
             if imo_ship_type and attained_aer is not None:
                 reference_cii = calculate_reference_cii(capacity, imo_ship_type)
                 required_cii = calculate_required_cii(reference_cii, year)
                 cii_rating = calculate_cii_rating(attained_aer, required_cii)
                 
-                # Store CII data in session state to retain across re-runs
+                # Store CII data and additional metrics in session state
                 st.session_state.cii_data = {
                     'attained_aer': attained_aer,
                     'required_cii': required_cii,
-                    'cii_rating': cii_rating
+                    'cii_rating': cii_rating,
+                    'total_distance': total_distance,
+                    'co2_emission': co2_emission
                 }
             else:
                 if imo_ship_type is None:
@@ -256,7 +260,7 @@ def main():
         else:
             st.error(f"No data found for vessel {vessel_name} in year {year}")
 
-    # Display stored CII results if available
+    # Display stored CII results and additional metrics if available
     if st.session_state.cii_data:
         col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
         with col1:
@@ -265,6 +269,10 @@ def main():
             st.metric('Required CII', f'{st.session_state.cii_data["required_cii"]:.4f}')
         with col3:
             st.metric('CII Rating', st.session_state.cii_data["cii_rating"])
+        with col4:
+            st.metric('Total Distance (NM)', f'{st.session_state.cii_data["total_distance"]:.2f}')
+        with col5:
+            st.metric('CO2 Emission (Tonnes)', f'{st.session_state.cii_data["co2_emission"]:.2f}')
 
     # CII Projections based on route
     st.subheader('CII Projections based on Route')
@@ -276,7 +284,6 @@ def main():
             port = st.text_input(f'Port {i+1}')
             ports.append(port)
         if st.button('Project CII'):
-            # Here you would add the logic to calculate CII based on the route
             st.write("CII projection based on route would be displayed here")
     
     with col2:
