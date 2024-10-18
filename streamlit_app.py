@@ -322,7 +322,7 @@ def main():
             capacity = st.session_state.cii_data['capacity']
 
             # Projected AER calculation
-            projected_aer = (co2_emission + (total_new_distance / speed) * daily_foc * 3.114) * 1000000 / (
+            projected_aer = (co2_emission + (total_new_distance / (speed*24)) * daily_foc * 3.114) * 1000000 / (
                     (total_existing_distance + total_new_distance) * capacity)
 
             # Step 3: Calculate Projected CII based on Projected AER
