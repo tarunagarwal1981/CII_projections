@@ -223,6 +223,7 @@ def main():
     with col2:
         year = st.number_input('Year for CII Calculation', min_value=2023, max_value=date.today().year, value=date.today().year)
     with col3:
+        
         calculate_clicked = st.button('Calculate CII')
 
     # Get database connection
