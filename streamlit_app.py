@@ -123,114 +123,62 @@ def get_vessel_data(engine, vessel_name, year):
         st.error(f"Error executing SQL query: {str(e)}")
         return pd.DataFrame()
 
-def calculate_reference_cii(capacity, ship_type):
-    params = {
-        'bulk_carrier': [
-            {'capacity_threshold': 279000, 'a': 4745, 'c': 0.622, 'use_dwt': True},
-            {'capacity_threshold': float('inf'), 'a': 4745, 'c': 0.622, 'use_dwt': False}
-        ],
-        'gas_carrier': [
-            {'capacity_threshold': 65000, 'a': 144050000000, 'c': 2.071, 'use_dwt': True},
-            {'capacity_threshold': float('inf'), 'a': 8104, 'c': 0.639, 'use_dwt': True}
-        ],
-        'tanker': [{'capacity_threshold': float('inf'), 'a': 5247, 'c': 0.61, 'use_dwt': True}],
-        'container_ship': [{'capacity_threshold': float('inf'), 'a': 1984, 'c': 0.489, 'use_dwt': True}],
-        'general_cargo_ship': [
-            {'capacity_threshold': 20000, 'a': 31948, 'c': 0.792, 'use_dwt': True},
-            {'capacity_threshold': float('inf'), 'a': 588, 'c': 0.3885, 'use_dwt': True}
-        ],
-        'refrigerated_cargo_carrier': [{'capacity_threshold': float('inf'), 'a': 4600, 'c': 0.557, 'use_dwt': True}],
-        'combination_carrier': [{'capacity_threshold': float('inf'), 'a': 40853, 'c': 0.812, 'use_dwt': True}],
-        'lng_carrier': [
-            {'capacity_threshold': 100000, 'a': 144790000000000, 'c': 2.673, 'use_dwt': True},
-            {'capacity_threshold': 65000, 'a': 144790000000000, 'c': 2.673, 'use_dwt': True},
-            {'capacity_threshold': float('inf'), 'a': 9.827, 'c': 0, 'use_dwt': True}
-        ],
-        'ro_ro_cargo_ship_vc': [{'capacity_threshold': float('inf'), 'a': 5739, 'c': 0.631, 'use_dwt': False}],
-        'ro_ro_cargo_ship': [{'capacity_threshold': float('inf'), 'a': 10952, 'c': 0.637, 'use_dwt': True}],
-        'ro_ro_passenger_ship': [{'capacity_threshold': float('inf'), 'a': 7540, 'c': 0.587, 'use_dwt': False}],
-        'cruise_passenger_ship': [{'capacity_threshold': float('inf'), 'a': 930, 'c': 0.383, 'use_dwt': False}]
-    }
+def load_world_ports():
+    return pd.read_csv("UpdatedPub150.csv")
 
-    ship_params = params.get(ship_type.lower())
-    if not ship_params:
-        raise ValueError(f"Unknown ship type: {ship_type}")
+world_ports_data = load_world_ports()
 
-    for param in ship_params:
-        if capacity <= param['capacity_threshold']:
-            a, c = param['a'], param['c']
-            used_capacity = capacity if param['use_dwt'] else param['capacity_threshold']
-            return a * (used_capacity ** -c)
+def world_port_index(port_to_match):
+    best_match = process.extractOne(port_to_match, world_ports_data['Main Port Name'])
+    return world_ports_data[world_ports_data['Main Port Name'] == best_match[0]].iloc[0]
 
-    raise ValueError(f"Capacity {capacity} is out of range for ship type {ship_type}")
+def route_distance(origin, destination):
+    try:
+        origin_port = world_port_index(origin)
+        destination_port = world_port_index(destination)
+        
+        origin_coords = [float(origin_port['Longitude']), float(origin_port['Latitude'])]
+        destination_coords = [float(destination_port['Longitude']), float(destination_port['Latitude'])]
+        
+        sea_route = sr.searoute(origin_coords, destination_coords, units="naut")
+        return int(sea_route['properties']['length'])
+    except Exception as e:
+        st.error(f"Error calculating distance between {origin} and {destination}: {str(e)}")
+        return 0
 
-def calculate_required_cii(reference_cii, year):
-    reduction_factors = {2023: 0.95, 2024: 0.93, 2025: 0.91, 2026: 0.89}
-    return reference_cii * reduction_factors.get(year, 1.0)
-
-def calculate_cii_rating(attained_cii, required_cii, ship_type, capacity):
-    dd_vectors = {
-        'bulk_carrier': [
-            {'capacity_threshold': 297000, 'd': [0.86, 0.94, 1.06, 1.18]},
-            {'capacity_threshold': float('inf'), 'd': [0.86, 0.94, 1.06, 1.18]}
-        ],
-        'tanker': [{'capacity_threshold': float('inf'), 'd': [0.82, 0.93, 1.08, 1.28]}],
-        'container_ship': [{'capacity_threshold': float('inf'), 'd': [0.83, 0.94, 1.07, 1.19]}],
-        'gas_carrier': [
-            {'capacity_threshold': 65000, 'd': [0.85, 0.95, 1.06, 1.25]},
-            {'capacity_threshold': float('inf'), 'd': [0.81, 0.91, 1.12, 1.44]}
-        ],
-        'lng_carrier': [
-            {'capacity_threshold': 65000, 'd': [0.78, 0.92, 1.10, 1.37]},
-            {'capacity_threshold': 100000, 'd': [0.78, 0.92, 1.10, 1.37]},
-            {'capacity_threshold': float('inf'), 'd': [0.89, 0.98, 1.06, 1.13]}
-        ],
-        'ro_ro_cargo_ship': [{'capacity_threshold': float('inf'), 'd': [0.66, 0.90, 1.11, 1.37]}],
-        'general_cargo_ship': [
-            {'capacity_threshold': 20000, 'd': [0.83, 0.94, 1.06, 1.19]},
-            {'capacity_threshold': float('inf'), 'd': [0.83, 0.94, 1.06, 1.19]}
-        ],
-        'refrigerated_cargo_carrier': [{'capacity_threshold': float('inf'), 'd': [0.78, 0.91, 1.07, 1.20]}],
-        'combination_carrier': [{'capacity_threshold': float('inf'), 'd': [0.87, 0.96, 1.06, 1.14]}],
-        'cruise_passenger_ship': [{'capacity_threshold': float('inf'), 'd': [0.87, 0.95, 1.06, 1.16]}],
-        'ro_ro_cargo_ship_vc': [{'capacity_threshold': float('inf'), 'd': [0.86, 0.94, 1.06, 1.16]}],
-        'ro_ro_passenger_ship': [{'capacity_threshold': float('inf'), 'd': [0.72, 0.90, 1.12, 1.41]}]
-    }
-
-    if ship_type is None:
-        raise ValueError("Ship type is None, cannot proceed with CII rating calculation.")
-
-    ship_params = dd_vectors.get(ship_type.lower())
-    if not ship_params:
-        raise ValueError(f"Unknown ship type: {ship_type}")
-
-    for param in ship_params:
-        if capacity <= param['capacity_threshold']:
-            d1, d2, d3, d4 = param['d']
-            break
-    else:
-        raise ValueError(f"Capacity {capacity} is out of range for ship type {ship_type}")
-
-    superior = np.exp(d1) * required_cii
-    lower = np.exp(d2) * required_cii
-    upper = np.exp(d3) * required_cii
-    inferior = np.exp(d4) * required_cii
-
-    if attained_cii <= superior:
-        return 'A'
-    elif attained_cii <= lower:
-        return 'B'
-    elif attained_cii <= upper:
-        return 'C'
-    elif attained_cii <= inferior:
-        return 'D'
-    else:
-        return 'E'
+def plot_route(ports):
+    m = folium.Map(location=[0, 0], zoom_start=2)
+    
+    if len(ports) >= 2 and all(ports):
+        coordinates = []
+        for i in range(len(ports) - 1):
+            try:
+                start_port = world_port_index(ports[i])
+                end_port = world_port_index(ports[i+1])
+                start_coords = [float(start_port['Latitude']), float(start_port['Longitude'])]
+                end_coords = [float(end_port['Latitude']), float(end_port['Longitude'])]
+                
+                folium.Marker(start_coords, popup=ports[i]).add_to(m)
+                if i == len(ports) - 2:
+                    folium.Marker(end_coords, popup=ports[i+1]).add_to(m)
+                
+                route = sr.searoute(start_coords[::-1], end_coords[::-1])
+                folium.PolyLine(locations=[list(reversed(coord)) for coord in route['geometry']['coordinates']], 
+                                color="red", weight=2, opacity=0.8).add_to(m)
+                
+                coordinates.extend([start_coords, end_coords])
+            except Exception as e:
+                st.error(f"Error plotting route for {ports[i]} to {ports[i+1]}: {str(e)}")
+        
+        if coordinates:
+            m.fit_bounds(coordinates)
+    
+    return m
 
 def main():
     st.title('🚢 CII Calculator')
 
-    # User input for vessel name, year, and calculate button in a single line with 5 columns
+    # User input for vessel name, year and calculate button in a single line with 5 columns
     col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
     with col1:
         vessel_name = st.text_input("Enter Vessel Name")
@@ -279,6 +227,34 @@ def main():
             st.metric('Required CII', f'{st.session_state.cii_data["required_cii"]:.4f}')
         with col3:
             st.metric('CII Rating', st.session_state.cii_data["cii_rating"])
+
+    # CII Projections based on route
+    st.subheader('CII Projections based on Route')
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        num_ports = st.number_input('Number of Ports', min_value=2, max_value=10, value=2)
+        ports = []
+        for i in range(num_ports):
+            port = st.text_input(f'Port {i+1}')
+            ports.append(port)
+        if st.button('Project CII'):
+            # Here you would add the logic to calculate CII based on the route
+            st.write("CII projection based on route would be displayed here")
+    
+    with col2:
+        # Always show the map
+        m = plot_route(ports)
+        st_folium(m, width=800, height=400)
+
+    # Display distance calculations
+    if len(ports) >= 2 and all(ports):
+        st.subheader('Distance Calculations')
+        total_distance = 0
+        for i in range(len(ports) - 1):
+            distance = route_distance(ports[i], ports[i+1])
+            total_distance += distance
+            st.write(f"Distance from {ports[i]} to {ports[i+1]}: {distance} nautical miles")
+        st.write(f"Total distance: {total_distance} nautical miles")
 
 if __name__ == '__main__':
     main()
