@@ -8,8 +8,6 @@ import folium
 from streamlit_folium import st_folium
 import searoute as sr
 from fuzzywuzzy import process
-from st_aggrid import AgGrid
-from st_aggrid import GridOptionsBuilder
 
 # Database configuration
 DB_CONFIG = {
@@ -164,31 +162,9 @@ def calculate_cii_rating(attained_cii, required_cii):
 # Load world ports data
 @st.cache_data
 def load_world_ports():
-    df = pd.read_csv("UpdatedPub150.csv")
-    return df['Main Port Name'].tolist()
+    return pd.read_csv("UpdatedPub150.csv")
 
-def port_autocomplete(port_names, default_value="", key=None):
-    df = pd.DataFrame({'port': port_names})
-    gb = GridOptionsBuilder.from_dataframe(df)
-    gb.configure_selection('single')
-    gb.configure_column("port", header_name="Select a port", filter=True)
-    grid_options = gb.build()
-
-    grid_response = AgGrid(
-        df,
-        gridOptions=grid_options,
-        data_return_mode='filtered_and_sorted',
-        update_mode='selection_changed',
-        fit_columns_on_grid_load=True,
-        theme="streamlit",
-        height=200,
-        key=key
-    )
-
-    selected_rows = grid_response["selected_rows"]
-    if selected_rows:
-        return selected_rows[0]["port"]
-    return default_value
+world_ports_data = load_world_ports()
 
 # Find best matching port
 def world_port_index(port_to_match):
@@ -305,9 +281,6 @@ def main():
     # Create a 2-column layout: left for inputs, right for map
     left_col, right_col = st.columns([3, 3])
 
-    # Load port names
-    port_names = load_world_ports()
-
     # Input fields in the left column
     with left_col:
         speed = st.number_input('Speed (knots)', min_value=0.0, value=12.0, step=0.1)
@@ -316,10 +289,8 @@ def main():
         
         ports = []
         for i in range(num_ports):
-            port = port_autocomplete(port_names, key=f'port_{i}')
-            if port:
-                ports.append(port)
-                st.write(f"Port {i+1}: {port}")
+            port = st.text_input(f'Port {i+1}', key=f'port_{i}')
+            ports.append(port)
 
     # Map in the right column
     with right_col:
