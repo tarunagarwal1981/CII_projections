@@ -123,32 +123,70 @@ def get_vessel_data(engine, vessel_name, year):
         st.error(f"Error executing SQL query: {str(e)}")
         return pd.DataFrame()
 
+# Function to calculate reference CII
+def calculate_reference_cii(capacity, ship_type):
+    params = {
+        'bulk_carrier': [{'capacity_threshold': 279000, 'a': 4745, 'c': 0.622}],
+        'gas_carrier': [{'capacity_threshold': 65000, 'a': 144050000000, 'c': 2.071}],
+        'tanker': [{'capacity_threshold': float('inf'), 'a': 5247, 'c': 0.61}],
+        'container_ship': [{'capacity_threshold': float('inf'), 'a': 1984, 'c': 0.489}],
+        'general_cargo_ship': [{'capacity_threshold': float('inf'), 'a': 31948, 'c': 0.792}],
+        'refrigerated_cargo_carrier': [{'capacity_threshold': float('inf'), 'a': 4600, 'c': 0.557}],
+        'lng_carrier': [{'capacity_threshold': 100000, 'a': 144790000000000, 'c': 2.673}],
+    }
+    ship_params = params.get(ship_type.lower())
+    if not ship_params:
+        raise ValueError(f"Unknown ship type: {ship_type}")
+    
+    a, c = ship_params[0]['a'], ship_params[0]['c']
+    return a * (capacity ** -c)
+
+# Function to calculate required CII
+def calculate_required_cii(reference_cii, year):
+    reduction_factors = {2023: 0.95, 2024: 0.93, 2025: 0.91, 2026: 0.89}
+    return reference_cii * reduction_factors.get(year, 1.0)
+
+# Function to calculate CII rating
+def calculate_cii_rating(attained_cii, required_cii):
+    if attained_cii <= required_cii:
+        return 'A'
+    elif attained_cii <= 1.05 * required_cii:
+        return 'B'
+    elif attained_cii <= 1.1 * required_cii:
+        return 'C'
+    elif attained_cii <= 1.15 * required_cii:
+        return 'D'
+    else:
+        return 'E'
+
+# Load world ports data
+@st.cache_data
 def load_world_ports():
     return pd.read_csv("UpdatedPub150.csv")
 
 world_ports_data = load_world_ports()
 
+# Find best matching port
 def world_port_index(port_to_match):
     best_match = process.extractOne(port_to_match, world_ports_data['Main Port Name'])
     return world_ports_data[world_ports_data['Main Port Name'] == best_match[0]].iloc[0]
 
+# Calculate route distance
 def route_distance(origin, destination):
     try:
         origin_port = world_port_index(origin)
         destination_port = world_port_index(destination)
-        
         origin_coords = [float(origin_port['Longitude']), float(origin_port['Latitude'])]
         destination_coords = [float(destination_port['Longitude']), float(destination_port['Latitude'])]
-        
         sea_route = sr.searoute(origin_coords, destination_coords, units="naut")
         return int(sea_route['properties']['length'])
     except Exception as e:
         st.error(f"Error calculating distance between {origin} and {destination}: {str(e)}")
         return 0
 
+# Plot route on the map
 def plot_route(ports):
     m = folium.Map(location=[0, 0], zoom_start=2)
-    
     if len(ports) >= 2 and all(ports):
         coordinates = []
         for i in range(len(ports) - 1):
@@ -202,7 +240,7 @@ def main():
             if imo_ship_type and attained_aer is not None:
                 reference_cii = calculate_reference_cii(capacity, imo_ship_type)
                 required_cii = calculate_required_cii(reference_cii, year)
-                cii_rating = calculate_cii_rating(attained_aer, required_cii, imo_ship_type, capacity)
+                cii_rating = calculate_cii_rating(attained_aer, required_cii)
                 
                 # Store CII data in session state to retain across re-runs
                 st.session_state.cii_data = {
