@@ -220,10 +220,10 @@ def main():
     col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
     with col1:
         vessel_name = st.text_input("Enter Vessel Name")
-        calculate_clicked = st.button('Calculate CII')
     with col2:
         year = st.number_input('Year for CII Calculation', min_value=2023, max_value=date.today().year, value=date.today().year)
-          
+    with col3:
+        calculate_clicked = st.button('Calculate CII')
 
     # Get database connection
     engine = get_db_engine()
@@ -236,8 +236,10 @@ def main():
             imo_ship_type = VESSEL_TYPE_MAPPING.get(vessel_type)
             capacity = df['capacity'].iloc[0]
             attained_aer = df['Attained_AER'].iloc[0]
-            total_distance = df['total_distance'].iloc[0]  # Extract total distance
-            co2_emission = df['CO2Emission'].iloc[0]  # Extract CO2 emission
+
+            # Add error handling for missing columns
+            total_distance = df['total_distance'].iloc[0] if 'total_distance' in df.columns else None
+            co2_emission = df['CO2Emission'].iloc[0] if 'CO2Emission' in df.columns else None
 
             if imo_ship_type and attained_aer is not None:
                 reference_cii = calculate_reference_cii(capacity, imo_ship_type)
@@ -269,10 +271,21 @@ def main():
             st.metric('Required CII', f'{st.session_state.cii_data["required_cii"]:.4f}')
         with col3:
             st.metric('CII Rating', st.session_state.cii_data["cii_rating"])
-        with col4:
-            st.metric('Total Distance (NM)', f'{st.session_state.cii_data["total_distance"]:.2f}')
-        with col5:
-            st.metric('CO2 Emission (Tonnes)', f'{st.session_state.cii_data["co2_emission"]:.2f}')
+
+        # Check if total_distance and CO2Emission exist before displaying
+        if st.session_state.cii_data.get('total_distance') is not None:
+            with col4:
+                st.metric('Total Distance (NM)', f'{st.session_state.cii_data["total_distance"]:.2f}')
+        else:
+            with col4:
+                st.metric('Total Distance (NM)', "N/A")
+
+        if st.session_state.cii_data.get('co2_emission') is not None:
+            with col5:
+                st.metric('CO2 Emission (Tonnes)', f'{st.session_state.cii_data["co2_emission"]:.2f}')
+        else:
+            with col5:
+                st.metric('CO2 Emission (Tonnes)', "N/A")
 
     # CII Projections based on route
     st.subheader('CII Projections based on Route')
