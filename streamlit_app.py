@@ -8,6 +8,8 @@ import folium
 from streamlit_folium import st_folium
 import searoute as sr
 from fuzzywuzzy import process
+from st_aggrid import AgGrid, GridOptionsBuilder
+from st_aggrid.grid_options_builder import GridOptionsBuilder
 
 # Database configuration
 DB_CONFIG = {
@@ -162,9 +164,37 @@ def calculate_cii_rating(attained_cii, required_cii):
 # Load world ports data
 @st.cache_data
 def load_world_ports():
-    return pd.read_csv("UpdatedPub150.csv")
-
+    df = pd.read_csv("UpdatedPub150.csv")
+    return df['Main Port Name'].tolist()
 world_ports_data = load_world_ports()
+
+def port_autocomplete(port_names, default_value="", key=None):
+    gb = GridOptionsBuilder.from_dict({
+        "rowData": [{"port": name} for name in port_names],
+        "columnDefs": [{"field": "port"}],
+        "rowSelection": "single",
+    })
+    gb.configure_default_column(filterable=True, sorteable=True)
+    grid_options = gb.build()
+    
+    grid_response = AgGrid(
+        pd.DataFrame({"port": port_names}),
+        gridOptions=grid_options,
+        data_return_mode="FILTERED_AND_SORTED",
+        update_mode="MODEL_CHANGED",
+        fit_columns_on_grid_load=True,
+        theme="streamlit",
+        enable_enterprise_modules=False,
+        height=200,
+        width="100%",
+        reload_data=False,
+        key=key
+    )
+    
+    selected_rows = grid_response["selected_rows"]
+    if selected_rows:
+        return selected_rows[0]["port"]
+    return default_value
 
 # Find best matching port
 def world_port_index(port_to_match):
@@ -281,6 +311,9 @@ def main():
     # Create a 2-column layout: left for inputs, right for map
     left_col, right_col = st.columns([3, 3])
 
+    # Load port names
+    port_names = load_world_ports()
+
     # Input fields in the left column
     with left_col:
         speed = st.number_input('Speed (knots)', min_value=0.0, value=12.0, step=0.1)
@@ -289,8 +322,10 @@ def main():
         
         ports = []
         for i in range(num_ports):
-            port = st.text_input(f'Port {i+1}', key=f'port_{i}')
-            ports.append(port)
+            port = port_autocomplete(port_names, key=f'port_{i}')
+            if port:
+                ports.append(port)
+                st.write(f"Port {i+1}: {port}")
 
     # Map in the right column
     with right_col:
