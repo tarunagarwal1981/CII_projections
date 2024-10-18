@@ -306,14 +306,18 @@ def main():
             port = st.text_input(f'Port {i+1}', key=f'port_{i}')
             ports.append(port)
 
-    # Map visualization in a wider space using a single merged column
-    if len(ports) >= 2 and all(ports):
-        col4, col5, col6 = st.columns([1, 2, 2])  # Merged columns to make space for the map
-        with col4:
-            st.write("")  # Placeholder to align the map properly
-        with col5, col6:
+    # Always show the map and update it when the user inputs ports
+    col4, col5, col6 = st.columns([1, 2, 2])  # Merged columns to make space for the map
+    with col4:
+        st.write("")  # Placeholder to align the map properly
+    with col5, col6:
+        # Show the map at all times
+        if len(ports) >= 2 and all(ports):
             m = plot_route(ports)
-            st_folium(m, width=800, height=400)
+        else:
+            # If ports are not entered, show a blank map
+            m = folium.Map(location=[0, 0], zoom_start=2)
+        st_folium(m, width=800, height=400)
 
     # Map visualization and projection calculation
     if st.button('Project CII'):
