@@ -326,11 +326,6 @@ def main():
                     st.metric('Required CII', f'{required_cii:.4f}')
                 with col3:
                     st.metric('CII Rating', cii_rating)
-
-                # CII Projection
-                st.subheader('CII Projection')
-                projection = project_cii(attained_aer)
-                st.line_chart(projection.set_index('Year'))
             else:
                 if imo_ship_type is None:
                     st.error(f"The vessel type '{vessel_type}' is not supported for CII calculations.")
