@@ -223,7 +223,6 @@ def main():
     with col2:
         year = st.number_input('Year for CII Calculation', min_value=2023, max_value=date.today().year, value=date.today().year)
     with col3:
-        
         calculate_clicked = st.button('Calculate CII')
 
     # Get database connection
@@ -290,16 +289,27 @@ def main():
 
     # CII Projections based on route
     st.subheader('CII Projections based on Route')
-    col1, col2 = st.columns([1, 2])
+
+    # Add Speed and Daily FOC input fields in a single row
+    col1, col2 = st.columns([1, 1])
     with col1:
-        num_ports = st.number_input('Number of Ports', min_value=2, max_value=10, value=2)
-        ports = []
-        for i in range(num_ports):
-            port = st.text_input(f'Port {i+1}')
-            ports.append(port)
-        if st.button('Project CII'):
-            st.write("CII projection based on route would be displayed here")
+        speed = st.number_input('Speed (knots)', min_value=0.0, value=12.0, step=0.1)
+    with col2:
+        daily_foc = st.number_input('Daily FOC (mT/d)', min_value=0.0, value=30.0, step=0.1)
+
+    # Port entry section
+    num_ports = st.number_input('Number of Ports', min_value=2, max_value=10, value=2)
+    ports = []
+    for i in range(num_ports):
+        port = st.text_input(f'Port {i+1}')
+        ports.append(port)
     
+    if st.button('Project CII'):
+        st.write(f"Speed: {speed} knots, Daily FOC: {daily_foc} mT/d")
+        st.write("CII projection based on route would be displayed here")
+
+    # Map visualization
+    col1, col2 = st.columns([1, 2])
     with col2:
         # Always show the map
         m = plot_route(ports)
