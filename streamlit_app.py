@@ -338,12 +338,14 @@ def main():
             else:
                 projected_cii_rating = 'E'
 
-            # Step 4: Display Projected AER and CII Rating
-            st.write(f"Projected AER: {projected_aer:.4f}")
-            st.write(f"Projected CII Rating: {projected_cii_rating}")
+            # Store Projected AER and Projected CII Rating in session state
+            st.session_state.projected_aer = projected_aer
+            st.session_state.projected_cii_rating = projected_cii_rating
 
-        else:
-            st.error("Please input valid ports.")
+    # Step 4: Display Projected AER and CII Rating if available
+    if 'projected_aer' in st.session_state and 'projected_cii_rating' in st.session_state:
+        st.write(f"Projected AER: {st.session_state.projected_aer:.4f}")
+        st.write(f"Projected CII Rating: {st.session_state.projected_cii_rating}")
 
     # Show map of ports
     col1, col2 = st.columns([1, 2])
