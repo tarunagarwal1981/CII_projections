@@ -292,7 +292,7 @@ def main():
     st.subheader('CII Projections based on Route')
 
     # Dividing the width into six columns: first three for inputs and next three for the map
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, _ = st.columns(4)  # The map will be shown in one wide column across three columns later
 
     # Input fields for Speed, Daily FOC, and Ports in the first three columns
     with col1:
@@ -306,10 +306,12 @@ def main():
             port = st.text_input(f'Port {i+1}', key=f'port_{i}')
             ports.append(port)
 
-    # Map visualization in the next three columns
-    with col4, col5, col6:
-        # Always show the map in the right three columns
-        if len(ports) >= 2 and all(ports):
+    # Map visualization in a wider space using a single merged column
+    if len(ports) >= 2 and all(ports):
+        col4, col5, col6 = st.columns([1, 2, 2])  # Merged columns to make space for the map
+        with col4:
+            st.write("")  # Placeholder to align the map properly
+        with col5, col6:
             m = plot_route(ports)
             st_folium(m, width=800, height=400)
 
