@@ -252,7 +252,8 @@ def main():
                     'required_cii': required_cii,
                     'cii_rating': cii_rating,
                     'total_distance': total_distance,
-                    'co2_emission': co2_emission
+                    'co2_emission': co2_emission,
+                    'capacity': capacity  # Adding capacity to session state for projected AER calculation
                 }
             else:
                 if imo_ship_type is None:
@@ -303,12 +304,47 @@ def main():
     for i in range(num_ports):
         port = st.text_input(f'Port {i+1}')
         ports.append(port)
-    
-    if st.button('Project CII'):
-        st.write(f"Speed: {speed} knots, Daily FOC: {daily_foc} mT/d")
-        st.write("CII projection based on route would be displayed here")
 
-    # Map visualization
+    # Map visualization and projection calculation
+    if st.button('Project CII'):
+        if len(ports) >= 2 and all(ports):
+            # Step 1: Calculate total distance between ports
+            total_new_distance = 0
+            for i in range(len(ports) - 1):
+                distance = route_distance(ports[i], ports[i+1])
+                total_new_distance += distance
+                st.write(f"Distance from {ports[i]} to {ports[i+1]}: {distance} nautical miles")
+            st.write(f"Total new distance from ports: {total_new_distance} nautical miles")
+
+            # Step 2: Calculate Projected AER
+            total_existing_distance = st.session_state.cii_data['total_distance']
+            co2_emission = st.session_state.cii_data['co2_emission']
+            capacity = st.session_state.cii_data['capacity']
+
+            projected_aer = (co2_emission + (total_new_distance / speed) * daily_foc * 3.114) / (
+                    (total_existing_distance + total_new_distance) * capacity)
+
+            # Step 3: Calculate Projected CII based on Projected AER
+            required_cii = st.session_state.cii_data['required_cii']
+            if projected_aer <= required_cii:
+                projected_cii_rating = 'A'
+            elif projected_aer <= 1.05 * required_cii:
+                projected_cii_rating = 'B'
+            elif projected_aer <= 1.1 * required_cii:
+                projected_cii_rating = 'C'
+            elif projected_aer <= 1.15 * required_cii:
+                projected_cii_rating = 'D'
+            else:
+                projected_cii_rating = 'E'
+
+            # Display Projected AER and CII rating
+            st.write(f"Projected AER: {projected_aer:.4f}")
+            st.write(f"Projected CII Rating: {projected_cii_rating}")
+
+        else:
+            st.error("Please input valid ports.")
+
+    # Show map of ports
     col1, col2 = st.columns([1, 2])
     with col2:
         # Always show the map
