@@ -321,6 +321,7 @@ def main():
             co2_emission = st.session_state.cii_data['co2_emission']
             capacity = st.session_state.cii_data['capacity']
 
+            # Projected AER calculation
             projected_aer = (co2_emission + (total_new_distance / speed) * daily_foc * 3.114) / (
                     (total_existing_distance + total_new_distance) * capacity)
 
@@ -337,7 +338,7 @@ def main():
             else:
                 projected_cii_rating = 'E'
 
-            # Display Projected AER and CII rating
+            # Step 4: Display Projected AER and CII Rating
             st.write(f"Projected AER: {projected_aer:.4f}")
             st.write(f"Projected CII Rating: {projected_cii_rating}")
 
