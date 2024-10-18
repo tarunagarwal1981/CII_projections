@@ -292,51 +292,52 @@ def route_distance(origin, destination):
 def main():
     st.title('🚢 CII Calculator')
 
-    # Get database connection
-    engine = get_db_engine()
-
-    # User input for vessel name and year
-    col1, col2, col3 = st.columns([2, 1, 1])
+    # User input for vessel name, year and calculate button in a single line with 5 columns
+    col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
     with col1:
         vessel_name = st.text_input("Enter Vessel Name")
     with col2:
         year = st.number_input('Year for CII Calculation', min_value=2023, max_value=date.today().year, value=date.today().year)
     with col3:
-        if st.button('Calculate CII'):
-            if vessel_name:
-                # Fetch vessel data and calculate CII
-                df = get_vessel_data(engine, vessel_name, year)
-                if not df.empty:
-                    vessel_type = df['vessel_type'].iloc[0]
-                    imo_ship_type = VESSEL_TYPE_MAPPING.get(vessel_type)
-                    capacity = df['capacity'].iloc[0]
-                    attained_aer = df['Attained_AER'].iloc[0]
+        calculate_clicked = st.button('Calculate CII')
 
-                    if imo_ship_type and attained_aer is not None:
-                        reference_cii = calculate_reference_cii(capacity, imo_ship_type)
-                        required_cii = calculate_required_cii(reference_cii, year)
-                        cii_rating = calculate_cii_rating(attained_aer, required_cii, imo_ship_type, capacity)
-                        
-                        # Display results
-                        st.subheader(f'CII Results for Year {year}')
-                        st.write(f"Vessel Name: {vessel_name}")
-                        st.write(f"Vessel Type: {vessel_type}")
-                        col1, col2, col3 = st.columns(3)
-                        col1.metric('Attained AER', f'{attained_aer:.4f}')
-                        col2.metric('Required CII', f'{required_cii:.4f}')
-                        col3.metric('CII Rating', cii_rating)
+    # Get database connection
+    engine = get_db_engine()
 
-                        # CII Projection
-                        st.subheader('CII Projection')
-                        projection = project_cii(attained_aer)
-                        st.line_chart(projection.set_index('Year'))
-                    else:
-                        if imo_ship_type is None:
-                            st.error(f"The vessel type '{vessel_type}' is not supported for CII calculations.")
-                        if attained_aer is None:
-                            st.error("Unable to calculate Attained AER. Please check the vessel's data.")
-                else:
-                    st.error(f"No data found for vessel {vessel_name} in year {year}")
+    if calculate_clicked and vessel_name:
+        # Fetch vessel data and calculate CII
+        df = get_vessel_data(engine, vessel_name, year)
+        if not df.empty:
+            vessel_type = df['vessel_type'].iloc[0]
+            imo_ship_type = VESSEL_TYPE_MAPPING.get(vessel_type)
+            capacity = df['capacity'].iloc[0]
+            attained_aer = df['Attained_AER'].iloc[0]
+
+            if imo_ship_type and attained_aer is not None:
+                reference_cii = calculate_reference_cii(capacity, imo_ship_type)
+                required_cii = calculate_required_cii(reference_cii, year)
+                cii_rating = calculate_cii_rating(attained_aer, required_cii, imo_ship_type, capacity)
+                
+                # Display results below the input line with 5 columns
+                col1, col2, col3, col4, col5 = st.columns([1, 1, 1, 1, 1])
+                with col1:
+                    st.metric('Attained AER', f'{attained_aer:.4f}')
+                with col2:
+                    st.metric('Required CII', f'{required_cii:.4f}')
+                with col3:
+                    st.metric('CII Rating', cii_rating)
+
+                # CII Projection
+                st.subheader('CII Projection')
+                projection = project_cii(attained_aer)
+                st.line_chart(projection.set_index('Year'))
+            else:
+                if imo_ship_type is None:
+                    st.error(f"The vessel type '{vessel_type}' is not supported for CII calculations.")
+                if attained_aer is None:
+                    st.error("Unable to calculate Attained AER. Please check the vessel's data.")
+        else:
+            st.error(f"No data found for vessel {vessel_name} in year {year}")
 
     # CII Projections based on route
     st.subheader('CII Projections based on Route')
