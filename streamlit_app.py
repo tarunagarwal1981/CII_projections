@@ -291,19 +291,27 @@ def main():
     # CII Projections based on route
     st.subheader('CII Projections based on Route')
 
-    # Add Speed and Daily FOC input fields in a single row
-    col1, col2 = st.columns([1, 1])
+    # Dividing the width into six columns: first three for inputs and next three for the map
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+    # Input fields for Speed, Daily FOC, and Ports in the first three columns
     with col1:
         speed = st.number_input('Speed (knots)', min_value=0.0, value=12.0, step=0.1)
     with col2:
         daily_foc = st.number_input('Daily FOC (mT/d)', min_value=0.0, value=30.0, step=0.1)
+    with col3:
+        num_ports = st.number_input('Number of Ports', min_value=2, max_value=10, value=2)
+        ports = []
+        for i in range(num_ports):
+            port = st.text_input(f'Port {i+1}', key=f'port_{i}')
+            ports.append(port)
 
-    # Port entry section
-    num_ports = st.number_input('Number of Ports', min_value=2, max_value=10, value=2)
-    ports = []
-    for i in range(num_ports):
-        port = st.text_input(f'Port {i+1}')
-        ports.append(port)
+    # Map visualization in the next three columns
+    with col4, col5, col6:
+        # Always show the map in the right three columns
+        if len(ports) >= 2 and all(ports):
+            m = plot_route(ports)
+            st_folium(m, width=800, height=400)
 
     # Map visualization and projection calculation
     if st.button('Project CII'):
@@ -322,7 +330,7 @@ def main():
             capacity = st.session_state.cii_data['capacity']
 
             # Projected AER calculation
-            projected_aer = (co2_emission + (total_new_distance / (speed*24)) * daily_foc * 3.114) * 1000000 / (
+            projected_aer = (co2_emission + (total_new_distance / (speed * 24)) * daily_foc * 3.114) * 1000000 / (
                     (total_existing_distance + total_new_distance) * capacity)
 
             # Step 3: Calculate Projected CII based on Projected AER
@@ -346,23 +354,6 @@ def main():
     if 'projected_aer' in st.session_state and 'projected_cii_rating' in st.session_state:
         st.write(f"Projected AER: {st.session_state.projected_aer:.4f}")
         st.write(f"Projected CII Rating: {st.session_state.projected_cii_rating}")
-
-    # Show map of ports
-    col1, col2 = st.columns([1, 2])
-    with col2:
-        # Always show the map
-        m = plot_route(ports)
-        st_folium(m, width=800, height=400)
-
-    # Display distance calculations
-    if len(ports) >= 2 and all(ports):
-        st.subheader('Distance Calculations')
-        total_distance = 0
-        for i in range(len(ports) - 1):
-            distance = route_distance(ports[i], ports[i+1])
-            total_distance += distance
-            st.write(f"Distance from {ports[i]} to {ports[i+1]}: {distance} nautical miles")
-        st.write(f"Total distance: {total_distance} nautical miles")
 
 if __name__ == '__main__':
     main()
