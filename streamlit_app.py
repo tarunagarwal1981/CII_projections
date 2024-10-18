@@ -8,8 +8,8 @@ import folium
 from streamlit_folium import st_folium
 import searoute as sr
 from fuzzywuzzy import process
-from st_aggrid import AgGrid, GridOptionsBuilder
-from st_aggrid.grid_options_builder import GridOptionsBuilder
+from st_aggrid import AgGrid
+from st_aggrid import GridOptionsBuilder
 
 # Database configuration
 DB_CONFIG = {
@@ -166,31 +166,25 @@ def calculate_cii_rating(attained_cii, required_cii):
 def load_world_ports():
     df = pd.read_csv("UpdatedPub150.csv")
     return df['Main Port Name'].tolist()
-world_ports_data = load_world_ports()
 
 def port_autocomplete(port_names, default_value="", key=None):
-    gb = GridOptionsBuilder.from_dict({
-        "rowData": [{"port": name} for name in port_names],
-        "columnDefs": [{"field": "port"}],
-        "rowSelection": "single",
-    })
-    gb.configure_default_column(filterable=True, sorteable=True)
+    df = pd.DataFrame({'port': port_names})
+    gb = GridOptionsBuilder.from_dataframe(df)
+    gb.configure_selection('single')
+    gb.configure_column("port", header_name="Select a port", filter=True)
     grid_options = gb.build()
-    
+
     grid_response = AgGrid(
-        pd.DataFrame({"port": port_names}),
+        df,
         gridOptions=grid_options,
-        data_return_mode="FILTERED_AND_SORTED",
-        update_mode="MODEL_CHANGED",
+        data_return_mode='filtered_and_sorted',
+        update_mode='selection_changed',
         fit_columns_on_grid_load=True,
         theme="streamlit",
-        enable_enterprise_modules=False,
         height=200,
-        width="100%",
-        reload_data=False,
         key=key
     )
-    
+
     selected_rows = grid_response["selected_rows"]
     if selected_rows:
         return selected_rows[0]["port"]
