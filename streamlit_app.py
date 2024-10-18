@@ -41,7 +41,32 @@ if 'cii_data' not in st.session_state:
 
 # Mapping of vessel types to IMO ship types
 VESSEL_TYPE_MAPPING = {
-    # (same as before)
+    'ASPHALT/BITUMEN TANKER': 'tanker',
+    'BULK CARRIER': 'bulk_carrier',
+    'CEMENT CARRIER': 'bulk_carrier',
+    'CHEM/PROD TANKER': 'tanker',
+    'CHEMICAL TANKER': 'tanker',
+    'Chemical/Products Tanker': 'tanker',
+    'Combination Carrier': 'combination_carrier',
+    'CONTAINER': 'container_ship',
+    'Container Ship': 'container_ship',
+    'Container/Ro-Ro Ship': 'ro_ro_cargo_ship',
+    'Crude Oil Tanker': 'tanker',
+    'Diving support vessel': None,
+    'Gas Carrier': 'gas_carrier',
+    'General Cargo Ship': 'general_cargo_ship',
+    'LNG CARRIER': 'lng_carrier',
+    'LPG CARRIER': 'gas_carrier',
+    'LPG Tanker': 'gas_carrier',
+    'Offshore Support Vessel': None,
+    'OIL TANKER': 'tanker',
+    'Other Ship Type': None,
+    'Passenger Ship': 'cruise_passenger_ship',
+    'Products Tanker': 'tanker',
+    'Refrigerated Cargo Ship': 'refrigerated_cargo_carrier',
+    'Ro-ro passenger ship': 'ro_ro_passenger_ship',
+    'Ro-Ro Ship': 'ro_ro_cargo_ship',
+    'Vehicle Carrier': 'ro_ro_cargo_ship_vc'
 }
 
 def get_db_engine():
@@ -52,8 +77,45 @@ def get_db_engine():
 
 def get_vessel_data(engine, vessel_name, year):
     query = text("""
-    # (SQL query as before)
+    SELECT 
+        t1."VESSEL_NAME" AS "Vessel",
+        t1."VESSEL_IMO" AS "IMO",
+        SUM("DISTANCE_TRAVELLED_ACTUAL") AS "total_distance",
+        COALESCE((SUM("FUEL_CONSUMPTION_HFO") - SUM("FC_FUEL_CONSUMPTION_HFO")) * 3.114, 0) + 
+        COALESCE((SUM("FUEL_CONSUMPTION_LFO") - SUM("FC_FUEL_CONSUMPTION_LFO")) * 3.151, 0) + 
+        COALESCE((SUM("FUEL_CONSUMPTION_GO_DO") - SUM("FC_FUEL_CONSUMPTION_GO_DO")) * 3.206, 0) + 
+        COALESCE((SUM("FUEL_CONSUMPTION_LNG") - SUM("FC_FUEL_CONSUMPTION_LNG")) * 2.75, 0) + 
+        COALESCE((SUM("FUEL_CONSUMPTION_LPG") - SUM("FC_FUEL_CONSUMPTION_LPG")) * 3.00, 0) + 
+        COALESCE((SUM("FUEL_CONSUMPTION_METHANOL") - SUM("FC_FUEL_CONSUMPTION_METHANOL")) * 1.375, 0) + 
+        COALESCE((SUM("FUEL_CONSUMPTION_ETHANOL") - SUM("FC_FUEL_CONSUMPTION_ETHANOL")) * 1.913, 0) AS "CO2Emission",
+        t2."deadweight" AS "capacity",
+        t2."vessel_type",
+        ROUND(CAST(SUM("DISTANCE_TRAVELLED_ACTUAL") * t2."deadweight" AS NUMERIC), 2) AS "Transportwork",
+        CASE 
+            WHEN ROUND(CAST(SUM("DISTANCE_TRAVELLED_ACTUAL") * t2."deadweight" AS NUMERIC), 2) <> 0 
+            THEN ROUND(CAST((COALESCE((SUM("FUEL_CONSUMPTION_HFO") - SUM("FC_FUEL_CONSUMPTION_HFO")) * 3.114, 0) + 
+                             COALESCE((SUM("FUEL_CONSUMPTION_LFO") - SUM("FC_FUEL_CONSUMPTION_LFO")) * 3.151, 0) + 
+                             COALESCE((SUM("FUEL_CONSUMPTION_GO_DO") - SUM("FC_FUEL_CONSUMPTION_GO_DO")) * 3.206, 0) + 
+                             COALESCE((SUM("FUEL_CONSUMPTION_LNG") - SUM("FC_FUEL_CONSUMPTION_LNG")) * 2.75, 0) + 
+                             COALESCE((SUM("FUEL_CONSUMPTION_LPG") - SUM("FC_FUEL_CONSUMPTION_LPG")) * 3.00, 0) + 
+                             COALESCE((SUM("FUEL_CONSUMPTION_METHANOL") - SUM("FC_FUEL_CONSUMPTION_METHANOL")) * 1.375, 0) + 
+                             COALESCE((SUM("FUEL_CONSUMPTION_ETHANOL") - SUM("FC_FUEL_CONSUMPTION_ETHANOL")) * 1.913, 0)
+            ) * 1000000 / (SUM("DISTANCE_TRAVELLED_ACTUAL") * t2."deadweight") AS NUMERIC), 2)
+            ELSE NULL
+        END AS "Attained_AER",
+        MIN("REPORT_DATE") AS "Startdate",
+        MAX("REPORT_DATE") AS "Enddate"
+    FROM 
+        "sf_consumption_logs" AS t1
+    LEFT JOIN 
+        "vessel_particulars" AS t2 ON t1."VESSEL_IMO" = t2."vessel_imo"
+    WHERE 
+        t1."VESSEL_NAME" = :vessel_name
+        AND EXTRACT(YEAR FROM "REPORT_DATE") = :year
+    GROUP BY 
+        t1."VESSEL_NAME", t1."VESSEL_IMO", t2."deadweight", t2."vessel_type"
     """)
+    
     try:
         df = pd.read_sql(query, engine, params={'vessel_name': vessel_name, 'year': year})
         return df
@@ -63,7 +125,6 @@ def get_vessel_data(engine, vessel_name, year):
 
 def calculate_reference_cii(capacity, ship_type):
     # (same as before)
-    pass
 
 def calculate_required_cii(reference_cii, year):
     reduction_factors = {2023: 0.95, 2024: 0.93, 2025: 0.91, 2026: 0.89}
@@ -71,7 +132,6 @@ def calculate_required_cii(reference_cii, year):
 
 def calculate_cii_rating(attained_cii, required_cii, ship_type, capacity):
     # (same as before)
-    pass
 
 def main():
     st.title('🚢 CII Calculator')
@@ -125,6 +185,8 @@ def main():
             st.metric('Required CII', f'{st.session_state.cii_data["required_cii"]:.4f}')
         with col3:
             st.metric('CII Rating', st.session_state.cii_data["cii_rating"])
+
+    # Additional code for route plotting and projections
 
 if __name__ == '__main__':
     main()
