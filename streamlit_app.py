@@ -321,7 +321,7 @@ def main():
     col1, col2, col3 = st.columns(3)
     with col1:
         vessel_name = st.text_input("Enter Vessel Name")
-         calculate_clicked = st.button('Calculate Current CII')
+        calculate_clicked = st.button('Calculate Current CII')
     with col2:
         year = st.number_input('Year for CII Calculation', 
                               min_value=2023, 
