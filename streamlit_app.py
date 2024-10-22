@@ -388,7 +388,7 @@ def main():
     st.markdown("### Voyage Planning")
     
     # Split layout for table and map
-    left_col, right_col = st.columns([6, 4])
+    left_col, right_col = st.columns([7, 5])
 
     # Route information table
     with left_col:
