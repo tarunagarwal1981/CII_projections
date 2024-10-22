@@ -37,7 +37,7 @@ st.markdown("""
 
 # Initialize session state for CII calculations
 if 'cii_data' not in st.session_state:
-    st.session_state.cii_data = None
+    st.session_state.cii_data = {}
 
 # Mapping of vessel types to IMO ship types
 VESSEL_TYPE_MAPPING = {
@@ -265,15 +265,15 @@ def main():
     if st.session_state.cii_data:
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
-            st.metric('Attained AER', f'{st.session_state.cii_data["attained_aer"]:.4f}')
+            st.metric('Attained AER', f'{st.session_state.cii_data.get("attained_aer", "N/A"):.4f}')
         with col2:
-            st.metric('Required CII', f'{st.session_state.cii_data["required_cii"]:.4f}')
+            st.metric('Required CII', f'{st.session_state.cii_data.get("required_cii", "N/A"):.4f}')
         with col3:
-            st.metric('CII Rating', st.session_state.cii_data["cii_rating"])
+            st.metric('CII Rating', st.session_state.cii_data.get("cii_rating", "N/A"))
         with col4:
-            st.metric('Total Distance (NM)', f'{st.session_state.cii_data["total_distance"]:.2f}' if st.session_state.cii_data.get('total_distance') is not None else "N/A")
+            st.metric('Total Distance (NM)', f'{st.session_state.cii_data.get("total_distance", "N/A"):.2f}' if st.session_state.cii_data.get('total_distance') is not None else "N/A")
         with col5:
-            st.metric('CO2 Emission (Tonnes)', f'{st.session_state.cii_data["co2_emission"]:.2f}' if st.session_state.cii_data.get('co2_emission') is not None else "N/A")
+            st.metric('CO2 Emission (Tonnes)', f'{st.session_state.cii_data.get("co2_emission", "N/A"):.2f}' if st.session_state.cii_data.get('co2_emission') is not None else "N/A")
 
     # CII Projections based on route
     st.subheader('CII Projections based on Route')
@@ -306,18 +306,19 @@ def main():
             total_new_distance = sum(route_distance(ports[i], ports[i+1]) for i in range(len(ports) - 1))
             st.write(f"Total new distance: {total_new_distance} nautical miles")
 
-            total_existing_distance = st.session_state.cii_data['total_distance']
-            co2_emission = st.session_state.cii_data['co2_emission']
-            capacity = st.session_state.cii_data['capacity']
+            total_existing_distance = st.session_state.cii_data.get('total_distance', 0)
+            co2_emission = st.session_state.cii_data.get('co2_emission', 0)
+            capacity = st.session_state.cii_data.get('capacity', 0)
 
-            projected_aer = (co2_emission + (total_new_distance / (speed * 24)) * daily_foc * 3.114) * 1000000 / (
-                    (total_existing_distance + total_new_distance) * capacity)
+            if total_existing_distance is not None and capacity > 0:
+                projected_aer = (co2_emission + (total_new_distance / (speed * 24)) * daily_foc * 3.114) * 1000000 / (
+                        (total_existing_distance + total_new_distance) * capacity)
 
-            required_cii = st.session_state.cii_data['required_cii']
-            projected_cii_rating = calculate_cii_rating(projected_aer, required_cii)
+                required_cii = st.session_state.cii_data.get('required_cii', 0)
+                projected_cii_rating = calculate_cii_rating(projected_aer, required_cii)
 
-            st.session_state.projected_aer = projected_aer
-            st.session_state.projected_cii_rating = projected_cii_rating
+                st.session_state.projected_aer = projected_aer
+                st.session_state.projected_cii_rating = projected_cii_rating
 
     # Display Projected AER and CII Rating if available
     if 'projected_aer' in st.session_state and 'projected_cii_rating' in st.session_state:
