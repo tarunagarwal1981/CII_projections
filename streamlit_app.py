@@ -261,3 +261,74 @@ def main():
                 if attained_aer is None:
                     st.error("Unable to calculate Attained AER. Please check the vessel's data.")
         else:
+            st.error(f"No data found for vessel {vessel_name} in year {year}")
+
+    # Display stored CII results and additional metrics if available
+    if st.session_state.cii_data:
+        col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            st.metric('Attained AER', f'{st.session_state.cii_data.get("attained_aer", "N/A"):.4f}')
+        with col2:
+            st.metric('Required CII', f'{st.session_state.cii_data.get("required_cii", "N/A"):.4f}')
+        with col3:
+            st.metric('CII Rating', st.session_state.cii_data.get("cii_rating", "N/A"))
+        with col4:
+            st.metric('Total Distance (NM)', f'{st.session_state.cii_data.get("total_distance", "N/A"):.2f}' if st.session_state.cii_data.get('total_distance') is not None else "N/A")
+        with col5:
+            st.metric('CO2 Emission (Tonnes)', f'{st.session_state.cii_data.get("co2_emission", "N/A"):.2f}' if st.session_state.cii_data.get('co2_emission') is not None else "N/A")
+
+    # CII Projections based on Route
+    st.subheader('CII Projections based on Route')
+
+    # Create a 10-column layout: 6 for table, 4 for map
+    left_col, right_col = st.columns([6, 4])
+
+    # Input fields in the left column
+    with left_col:
+        st.write("### Route Information Table")
+        port_data_df = pd.DataFrame(
+            st.session_state.port_table_data,
+            columns=["From Port", "To Port", "Port Days", "Speed (knots)", "Fuel Used (mT)", "Consumption/day (mT)"]
+        )
+        edited_df = st.experimental_data_editor(port_data_df, num_rows="dynamic", key="port_table_editor")
+        st.session_state.port_table_data = edited_df.values.tolist()
+
+    # Map in the right column
+    with right_col:
+        if len(st.session_state.port_table_data) >= 2:
+            ports = [row[0] for row in st.session_state.port_table_data if row[0]] + [st.session_state.port_table_data[-1][1]]
+            if all(ports):
+                m = plot_route(ports)
+            else:
+                m = folium.Map(location=[0, 0], zoom_start=2)
+        else:
+            m = folium.Map(location=[0, 0], zoom_start=2)
+        st_folium(m, width=None, height=400)  # width=None allows it to fill the column
+
+    # Project CII button and calculations
+    if st.button('Project CII'):
+        if len(st.session_state.port_table_data) >= 2:
+            total_new_distance = sum(route_distance(row[0], row[1]) for row in st.session_state.port_table_data if row[0] and row[1])
+            st.write(f"Total new distance: {total_new_distance} nautical miles")
+
+            total_existing_distance = st.session_state.cii_data.get('total_distance', 0)
+            co2_emission = st.session_state.cii_data.get('co2_emission', 0)
+            capacity = st.session_state.cii_data.get('capacity', 0)
+
+            if total_existing_distance is not None and capacity > 0:
+                projected_aer = (co2_emission + (total_new_distance / (sum(row[3] for row in st.session_state.port_table_data) * 24)) * sum(row[4] for row in st.session_state.port_table_data) * 3.114) * 1000000 / (
+                        (total_existing_distance + total_new_distance) * capacity)
+
+                required_cii = st.session_state.cii_data.get('required_cii', 0)
+                projected_cii_rating = calculate_cii_rating(projected_aer, required_cii)
+
+                st.session_state.projected_aer = projected_aer
+                st.session_state.projected_cii_rating = projected_cii_rating
+
+    # Display Projected AER and CII Rating if available
+    if 'projected_aer' in st.session_state and 'projected_cii_rating' in st.session_state:
+        st.write(f"Projected AER: {st.session_state.projected_aer:.4f}")
+        st.write(f"Projected CII Rating: {st.session_state.projected_cii_rating}")
+
+if __name__ == '__main__':
+    main()
