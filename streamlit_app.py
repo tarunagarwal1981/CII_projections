@@ -38,6 +38,8 @@ st.markdown("""
 # Initialize session state for CII calculations
 if 'cii_data' not in st.session_state:
     st.session_state.cii_data = {}
+if 'port_table_data' not in st.session_state:
+    st.session_state.port_table_data = []
 
 # Mapping of vessel types to IMO ship types
 VESSEL_TYPE_MAPPING = {
@@ -259,71 +261,3 @@ def main():
                 if attained_aer is None:
                     st.error("Unable to calculate Attained AER. Please check the vessel's data.")
         else:
-            st.error(f"No data found for vessel {vessel_name} in year {year}")
-
-    # Display stored CII results and additional metrics if available
-    if st.session_state.cii_data:
-        col1, col2, col3, col4, col5 = st.columns(5)
-        with col1:
-            st.metric('Attained AER', f'{st.session_state.cii_data.get("attained_aer", "N/A"):.4f}')
-        with col2:
-            st.metric('Required CII', f'{st.session_state.cii_data.get("required_cii", "N/A"):.4f}')
-        with col3:
-            st.metric('CII Rating', st.session_state.cii_data.get("cii_rating", "N/A"))
-        with col4:
-            st.metric('Total Distance (NM)', f'{st.session_state.cii_data.get("total_distance", "N/A"):.2f}' if st.session_state.cii_data.get('total_distance') is not None else "N/A")
-        with col5:
-            st.metric('CO2 Emission (Tonnes)', f'{st.session_state.cii_data.get("co2_emission", "N/A"):.2f}' if st.session_state.cii_data.get('co2_emission') is not None else "N/A")
-
-    # CII Projections based on route
-    st.subheader('CII Projections based on Route')
-
-    # Create a 2-column layout: left for inputs, right for map
-    left_col, right_col = st.columns([3, 3])
-
-    # Input fields in the left column
-    with left_col:
-        speed = st.number_input('Speed (knots)', min_value=0.0, value=12.0, step=0.1)
-        daily_foc = st.number_input('Daily FOC (mT/d)', min_value=0.0, value=30.0, step=0.1)
-        num_ports = st.number_input('Number of Ports', min_value=2, max_value=10, value=2)
-        
-        ports = []
-        for i in range(num_ports):
-            port = st.text_input(f'Port {i+1}', key=f'port_{i}')
-            ports.append(port)
-
-    # Map in the right column
-    with right_col:
-        if len(ports) >= 2 and all(ports):
-            m = plot_route(ports)
-        else:
-            m = folium.Map(location=[0, 0], zoom_start=2)
-        st_folium(m, width=None, height=400)  # width=None allows it to fill the column
-
-    # Project CII button and calculations
-    if st.button('Project CII'):
-        if len(ports) >= 2 and all(ports):
-            total_new_distance = sum(route_distance(ports[i], ports[i+1]) for i in range(len(ports) - 1))
-            st.write(f"Total new distance: {total_new_distance} nautical miles")
-
-            total_existing_distance = st.session_state.cii_data.get('total_distance', 0)
-            co2_emission = st.session_state.cii_data.get('co2_emission', 0)
-            capacity = st.session_state.cii_data.get('capacity', 0)
-
-            if total_existing_distance is not None and capacity > 0:
-                projected_aer = (co2_emission + (total_new_distance / (speed * 24)) * daily_foc * 3.114) * 1000000 / (
-                        (total_existing_distance + total_new_distance) * capacity)
-
-                required_cii = st.session_state.cii_data.get('required_cii', 0)
-                projected_cii_rating = calculate_cii_rating(projected_aer, required_cii)
-
-                st.session_state.projected_aer = projected_aer
-                st.session_state.projected_cii_rating = projected_cii_rating
-
-    # Display Projected AER and CII Rating if available
-    if 'projected_aer' in st.session_state and 'projected_cii_rating' in st.session_state:
-        st.write(f"Projected AER: {st.session_state.projected_aer:.4f}")
-        st.write(f"Projected CII Rating: {st.session_state.projected_cii_rating}")
-
-if __name__ == '__main__':
-    main()
