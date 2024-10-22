@@ -434,7 +434,7 @@ def main():
                     required=True
                 ),
                 "Fuel Used (mT)": st.column_config.NumberColumn(
-                    "Fuel Used (mT)",
+                    "Fuel Used (mT/d)",
                     help="Enter total fuel consumption",
                     min_value=0,
                     step=0.1,
