@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine, text
 import urllib.parse
-from datetime import date
+from datetime import date, timedelta
 import folium
 from streamlit_folium import st_folium
 import searoute as sr
@@ -32,6 +32,12 @@ st.markdown("""
         background-color: #4CAF50;
         color: white;
     }
+    .metric-card {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -40,6 +46,8 @@ if 'cii_data' not in st.session_state:
     st.session_state.cii_data = {}
 if 'port_table_data' not in st.session_state:
     st.session_state.port_table_data = []
+if 'voyage_calculations' not in st.session_state:
+    st.session_state.voyage_calculations = []
 
 # Vessel type mapping
 VESSEL_TYPE_MAPPING = {
@@ -54,19 +62,14 @@ VESSEL_TYPE_MAPPING = {
     'Container Ship': 'container_ship',
     'Container/Ro-Ro Ship': 'ro_ro_cargo_ship',
     'Crude Oil Tanker': 'tanker',
-    'Diving support vessel': None,
     'Gas Carrier': 'gas_carrier',
     'General Cargo Ship': 'general_cargo_ship',
     'LNG CARRIER': 'lng_carrier',
     'LPG CARRIER': 'gas_carrier',
     'LPG Tanker': 'gas_carrier',
-    'Offshore Support Vessel': None,
     'OIL TANKER': 'tanker',
-    'Other Ship Type': None,
-    'Passenger Ship': 'cruise_passenger_ship',
     'Products Tanker': 'tanker',
     'Refrigerated Cargo Ship': 'refrigerated_cargo_carrier',
-    'Ro-ro passenger ship': 'ro_ro_passenger_ship',
     'Ro-Ro Ship': 'ro_ro_cargo_ship',
     'Vehicle Carrier': 'ro_ro_cargo_ship_vc'
 }
@@ -106,9 +109,7 @@ def get_vessel_data(engine, vessel_name, year):
                 COALESCE((SUM("FUEL_CONSUMPTION_ETHANOL") - SUM("FC_FUEL_CONSUMPTION_ETHANOL")) * 1.913, 0)
             ) * 1000000 / (SUM("DISTANCE_TRAVELLED_ACTUAL") * t2."deadweight") AS NUMERIC), 2)
             ELSE NULL
-        END AS "Attained_AER",
-        MIN("REPORT_DATE") AS "Startdate",
-        MAX("REPORT_DATE") AS "Enddate"
+        END AS "Attained_AER"
     FROM 
         "sf_consumption_logs" AS t1
     LEFT JOIN 
@@ -168,16 +169,44 @@ def load_world_ports():
     """Load and cache world ports data"""
     return pd.read_csv("UpdatedPub150.csv")
 
-def world_port_index(port_to_match):
-    """Find best matching port from world ports data"""
-    best_match = process.extractOne(port_to_match, world_ports_data['Main Port Name'])
-    return world_ports_data[world_ports_data['Main Port Name'] == best_match[0]].iloc[0]
+def calculate_segment_metrics(row, world_ports_data):
+    """Calculate metrics for a single voyage segment"""
+    if not all([row[0], row[1], row[2], row[3], row[4]]):  # Check if all required fields are filled
+        return None
+    
+    try:
+        # Calculate distance
+        distance = route_distance(row[0], row[1], world_ports_data)
+        
+        # Calculate time at sea (days)
+        sea_time = distance / (row[3] * 24)  # speed in knots
+        
+        # Total segment time (sea time + port time)
+        total_time = sea_time + row[2]  # port days
+        
+        # Calculate CO2 emissions (assuming HFO with factor 3.114)
+        co2_emissions = row[4] * 3.114  # fuel used * CO2 factor
+        
+        return {
+            'from_port': row[0],
+            'to_port': row[1],
+            'distance': distance,
+            'sea_time': sea_time,
+            'port_time': row[2],
+            'total_time': total_time,
+            'speed': row[3],
+            'fuel_used': row[4],
+            'co2_emissions': co2_emissions
+        }
+    except Exception as e:
+        st.error(f"Error calculating segment metrics: {str(e)}")
+        return None
 
-def route_distance(origin, destination):
+def route_distance(origin, destination, world_ports_data):
     """Calculate route distance between two ports"""
     try:
-        origin_port = world_port_index(origin)
-        destination_port = world_port_index(destination)
+        origin_port = world_port_index(origin, world_ports_data)
+        destination_port = world_port_index(destination, world_ports_data)
         origin_coords = [float(origin_port['Longitude']), float(origin_port['Latitude'])]
         destination_coords = [float(destination_port['Longitude']), float(destination_port['Latitude'])]
         sea_route = sr.searoute(origin_coords, destination_coords, units="naut")
@@ -186,7 +215,12 @@ def route_distance(origin, destination):
         st.error(f"Error calculating distance between {origin} and {destination}: {str(e)}")
         return 0
 
-def plot_route(ports):
+def world_port_index(port_to_match, world_ports_data):
+    """Find best matching port from world ports data"""
+    best_match = process.extractOne(port_to_match, world_ports_data['Main Port Name'])
+    return world_ports_data[world_ports_data['Main Port Name'] == best_match[0]].iloc[0]
+
+def plot_route(ports, world_ports_data):
     """Plot route on a Folium map"""
     m = folium.Map(location=[0, 0], zoom_start=2)
     
@@ -194,15 +228,26 @@ def plot_route(ports):
         coordinates = []
         for i in range(len(ports) - 1):
             try:
-                start_port = world_port_index(ports[i])
-                end_port = world_port_index(ports[i+1])
+                start_port = world_port_index(ports[i], world_ports_data)
+                end_port = world_port_index(ports[i+1], world_ports_data)
                 start_coords = [float(start_port['Latitude']), float(start_port['Longitude'])]
                 end_coords = [float(end_port['Latitude']), float(end_port['Longitude'])]
                 
-                folium.Marker(start_coords, popup=ports[i]).add_to(m)
-                if i == len(ports) - 2:
-                    folium.Marker(end_coords, popup=ports[i+1]).add_to(m)
+                # Add markers for ports
+                folium.Marker(
+                    start_coords,
+                    popup=ports[i],
+                    icon=folium.Icon(color='green' if i == 0 else 'blue')
+                ).add_to(m)
                 
+                if i == len(ports) - 2:
+                    folium.Marker(
+                        end_coords,
+                        popup=ports[i+1],
+                        icon=folium.Icon(color='red')
+                    ).add_to(m)
+                
+                # Draw route line
                 route = sr.searoute(start_coords[::-1], end_coords[::-1])
                 folium.PolyLine(
                     locations=[list(reversed(coord)) for coord in route['geometry']['coordinates']], 
@@ -220,10 +265,49 @@ def plot_route(ports):
     
     return m
 
+def calculate_projected_cii(current_data, voyage_calculations):
+    """Calculate projected CII based on current data and planned voyage"""
+    if not voyage_calculations:
+        return None
+    
+    try:
+        # Sum up new voyage metrics
+        total_new_distance = sum(seg['distance'] for seg in voyage_calculations)
+        total_new_co2 = sum(seg['co2_emissions'] for seg in voyage_calculations)
+        
+        # Get current annual values
+        current_distance = current_data.get('total_distance', 0)
+        current_co2 = current_data.get('co2_emission', 0)
+        capacity = current_data.get('capacity', 0)
+        
+        if capacity <= 0:
+            raise ValueError("Invalid vessel capacity")
+            
+        # Calculate combined metrics
+        total_distance = current_distance + total_new_distance
+        total_co2 = current_co2 + total_new_co2
+        
+        # Calculate projected AER
+        projected_aer = (total_co2 * 1000000) / (total_distance * capacity)
+        
+        return {
+            'projected_aer': projected_aer,
+            'new_distance': total_new_distance,
+            'new_co2': total_new_co2,
+            'total_distance': total_distance,
+            'total_co2': total_co2
+        }
+    except Exception as e:
+        st.error(f"Error calculating projected CII: {str(e)}")
+        return None
+
 def main():
     st.title('🚢 CII Calculator')
 
-    # User inputs
+    # Load world ports data
+    world_ports_data = load_world_ports()
+
+    # User inputs for vessel and year
     col1, col2, col3 = st.columns(3)
     with col1:
         vessel_name = st.text_input("Enter Vessel Name")
@@ -233,12 +317,9 @@ def main():
                               max_value=date.today().year, 
                               value=date.today().year)
     with col3:
-        calculate_clicked = st.button('Calculate CII')
+        calculate_clicked = st.button('Calculate Current CII')
 
-    # Load world ports data
-    world_ports_data = load_world_ports()
-
-    # Calculate CII
+    # Calculate current CII
     if calculate_clicked and vessel_name:
         engine = get_db_engine()
         df = get_vessel_data(engine, vessel_name, year)
@@ -260,7 +341,9 @@ def main():
                     'cii_rating': cii_rating,
                     'total_distance': df['total_distance'].iloc[0],
                     'co2_emission': df['CO2Emission'].iloc[0],
-                    'capacity': capacity
+                    'capacity': capacity,
+                    'vessel_type': vessel_type,
+                    'imo_ship_type': imo_ship_type
                 }
             else:
                 if imo_ship_type is None:
@@ -270,154 +353,160 @@ def main():
         else:
             st.error(f"No data found for vessel {vessel_name} in year {year}")
 
-    # Display CII results
+    # Display current CII results
     if st.session_state.cii_data:
+        st.markdown("### Current CII Metrics")
         col1, col2, col3, col4, col5 = st.columns(5)
         with col1:
             st.metric('Attained AER', 
-                     f'{st.session_state.cii_data.get("attained_aer", "N/A"):.4f}')
+                     f"{st.session_state.cii_data['attained_aer']:.4f}")
         with col2:
             st.metric('Required CII', 
-                     f'{st.session_state.cii_data.get("required_cii", "N/A"):.4f}')
+                     f"{st.session_state.cii_data['required_cii']:.4f}")
         with col3:
             st.metric('CII Rating', 
-                     st.session_state.cii_data.get("cii_rating", "N/A"))
+                     st.session_state.cii_data['cii_rating'])
         with col4:
-            total_distance = st.session_state.cii_data.get("total_distance")
             st.metric('Total Distance (NM)', 
-                     f'{total_distance:.2f}' if total_distance is not None else "N/A")
+                     f"{st.session_state.cii_data['total_distance']:,.0f}")
         with col5:
-            co2_emission = st.session_state.cii_data.get("co2_emission")
-            st.metric('CO2 Emission (Tonnes)', 
-                     f'{co2_emission:.2f}' if co2_emission is not None else "N/A")
+            st.metric('CO2 Emission (MT)', 
+                     f"{st.session_state.cii_data['co2_emission']:,.1f}")
 
-    # CII Projections section
-    st.subheader('CII Projections based on Route')
-
-    # Split layout for table and map
-    left_col, right_col = st.columns([6, 4])
-
-    # Route information table
-    with left_col:
-        st.write("### Route Information Table")
+        # Voyage Planning Section
+        st.markdown("### Voyage Planning")
         
-        # Create DataFrame for route information
-        port_data_df = pd.DataFrame(
-            st.session_state.port_table_data,
-            columns=["From Port", "To Port", "Port Days", "Speed (knots)", 
-                    "Fuel Used (mT)", "Consumption/day (mT)"]
-        )
-        
-        # Use data_editor instead of experimental_data_editor
-        edited_df = st.data_editor(
-            port_data_df,
-            num_rows="dynamic",
-            key="port_table_editor",
-            column_config={
-                "From Port": st.column_config.TextColumn(
-                    "From Port",
-                    help="Enter departure port name"
-                ),
-                "To Port": st.column_config.TextColumn(
-                    "To Port",
-                    help="Enter arrival port name"
-                ),
-                "Port Days": st.column_config.NumberColumn(
-                    "Port Days",
-                    help="Enter number of days in port",
-                    min_value=0,
-                    max_value=100,
-                    step=0.5
-                ),
-                "Speed (knots)": st.column_config.NumberColumn(
-                    "Speed (knots)",
-                    help="Enter vessel speed in knots",
-                    min_value=0,
-                    max_value=30,
-                    step=0.1
-                ),
-                "Fuel Used (mT)": st.column_config.NumberColumn(
-                    "Fuel Used (mT)",
-                    help="Enter total fuel consumption",
-                    min_value=0,
-                    step=0.1
-                ),
-                "Consumption/day (mT)": st.column_config.NumberColumn(
-                    "Consumption/day (mT)",
-                    help="Enter daily fuel consumption",
-                    min_value=0,
-                    step=0.1
-                )
-            }
-        )
-        
-        # Update session state with edited data
-        st.session_state.port_table_data = edited_df.values.tolist()
+        # Split layout for table and map
+        left_col, right_col = st.columns([6, 4])
 
-    # Map display
-    with right_col:
-        if len(st.session_state.port_table_data) >= 2:
-            ports = [row[0] for row in st.session_state.port_table_data if row[0]] + \
-                   [st.session_state.port_table_data[-1][1]] if st.session_state.port_table_data[-1][1] else []
+        # Route information table
+        with left_col:
+            st.markdown("#### Route Information")
             
-            if all(ports):
-                m = plot_route(ports)
+            # Create DataFrame for route information
+            port_data_df = pd.DataFrame(
+                st.session_state.port_table_data,
+                columns=["From Port", "To Port", "Port Days", "Speed (knots)", 
+                        "Fuel Used (mT)", "Consumption/day (mT)"]
+            )
+            
+            # Data editor for route planning
+            edited_df = st.data_editor(
+                port_data_df,
+                num_rows="dynamic",
+                key="port_table_editor",
+                column_config={
+                    "From Port": st.column_config.TextColumn(
+                        "From Port",
+                        help="Enter departure port name",
+                        required=True
+                    ),
+                    "To Port": st.column_config.TextColumn(
+                        "To Port",
+                        help="Enter arrival port name",
+                        required=True
+                    ),
+                    "Port Days": st.column_config.NumberColumn(
+                        "Port Days",
+                        help="Enter number of days in port",
+                        min_value=0,
+                        max_value=100,
+                        step=0.5,
+                        required=True
+                    ),
+                    "Speed (knots)": st.column_config.NumberColumn(
+                        "Speed (knots)",
+                        help="Enter vessel speed in knots",
+                        min_value=1,
+                        max_value=30,
+                        step=0.1,
+                        required=True
+                    ),
+                    "Fuel Used (mT)": st.column_config.NumberColumn(
+                        "Fuel Used (mT)",
+                        help="Enter total fuel consumption",
+                        min_value=0,
+                        step=0.1,
+                        required=True
+                    ),
+                    "Consumption/day (mT)": st.column_config.NumberColumn(
+                        "Consumption/day (mT)",
+                        help="Enter daily fuel consumption",
+                        min_value=0,
+                        step=0.1
+                    )
+                }
+            )
+            
+            # Update session state with edited data
+            st.session_state.port_table_data = edited_df.values.tolist()
+
+        # Map display
+        with right_col:
+            if len(st.session_state.port_table_data) >= 1:
+                ports = [row[0] for row in st.session_state.port_table_data if row[0]]
+                if st.session_state.port_table_data[-1][1]:  # Add last destination
+                    ports.append(st.session_state.port_table_data[-1][1])
+                
+                if len(ports) >= 2:
+                    m = plot_route(ports, world_ports_data)
+                else:
+                    m = folium.Map(location=[0, 0], zoom_start=2)
             else:
                 m = folium.Map(location=[0, 0], zoom_start=2)
-        else:
-            m = folium.Map(location=[0, 0], zoom_start=2)
-        
-        st_folium(m, width=None, height=400)
+            
+            st_folium(m, width=None, height=400)
 
-    # Project CII calculations
-    if st.button('Project CII'):
-        if len(st.session_state.port_table_data) >= 2:
-            # Calculate total new distance
-            total_new_distance = sum(
-                route_distance(row[0], row[1]) 
-                for row in st.session_state.port_table_data 
-                if row[0] and row[1]
-            )
-            st.write(f"Total new distance: {total_new_distance:,.2f} nautical miles")
-
-            # Get existing values from session state
-            total_existing_distance = st.session_state.cii_data.get('total_distance', 0)
-            co2_emission = st.session_state.cii_data.get('co2_emission', 0)
-            capacity = st.session_state.cii_data.get('capacity', 0)
-
-            if total_existing_distance is not None and capacity > 0:
-                # Calculate projected AER
-                try:
-                    total_speed_hours = sum(row[3] for row in st.session_state.port_table_data if row[3] is not None) * 24
-                    total_fuel = sum(row[4] for row in st.session_state.port_table_data if row[4] is not None)
+        # Calculate projected CII button
+        if st.button('Calculate Projected CII'):
+            if len(st.session_state.port_table_data) >= 1:
+                # Calculate metrics for each voyage segment
+                voyage_calculations = []
+                for row in st.session_state.port_table_data:
+                    segment_metrics = calculate_segment_metrics(row, world_ports_data)
+                    if segment_metrics:
+                        voyage_calculations.append(segment_metrics)
+                
+                if voyage_calculations:
+                    # Calculate projected CII
+                    projections = calculate_projected_cii(st.session_state.cii_data, voyage_calculations)
                     
-                    if total_speed_hours > 0:
-                        projected_aer = (
-                            co2_emission + 
-                            (total_new_distance / total_speed_hours) * 
-                            total_fuel * 3.114
-                        ) * 1000000 / ((total_existing_distance + total_new_distance) * capacity)
-
-                        required_cii = st.session_state.cii_data.get('required_cii', 0)
-                        projected_cii_rating = calculate_cii_rating(projected_aer, required_cii)
-
-                        st.session_state.projected_aer = projected_aer
-                        st.session_state.projected_cii_rating = projected_cii_rating
-
-                        # Display projected results
+                    if projections:
+                        # Display segment calculations
+                        st.markdown("#### Voyage Segment Calculations")
+                        segment_df = pd.DataFrame(voyage_calculations)
+                        st.dataframe(segment_df)
+                        
+                        # Display projected metrics
+                        st.markdown("#### Projected CII Metrics")
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Projected AER", 
+                                    f"{projections['projected_aer']:.4f}", 
+                                    f"{projections['projected_aer'] - st.session_state.cii_data['attained_aer']:.4f}")
+                        with col2:
+                            projected_rating = calculate_cii_rating(
+                                projections['projected_aer'], 
+                                st.session_state.cii_data['required_cii']
+                            )
+                            st.metric("Projected CII Rating", projected_rating)
+                        with col3:
+                            st.metric("Additional CO2 (MT)", 
+                                    f"{projections['new_co2']:,.1f}")
+                        
+                        # Display totals
+                        st.markdown("#### Total Impact")
                         col1, col2 = st.columns(2)
                         with col1:
-                            st.metric('Projected AER', f'{projected_aer:.4f}')
+                            st.metric("Total Distance (NM)", 
+                                    f"{projections['total_distance']:,.0f}", 
+                                    f"+{projections['new_distance']:,.0f}")
                         with col2:
-                            st.metric('Projected CII Rating', projected_cii_rating)
-                    else:
-                        st.error("Please enter valid speed values for all routes.")
-                except Exception as e:
-                    st.error(f"Error calculating projections: {str(e)}")
+                            st.metric("Total CO2 (MT)", 
+                                    f"{projections['total_co2']:,.1f}", 
+                                    f"+{projections['new_co2']:,.1f}")
             else:
-                st.error("Missing vessel data for CII projections. Please calculate current CII first.")
-        else:
-            st.warning("Please add at least one complete route to calculate projections.")
+                st.warning("Please add at least one voyage segment to calculate projections.")
 
 if __name__ == '__main__':
     main()
