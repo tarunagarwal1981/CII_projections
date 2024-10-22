@@ -194,7 +194,7 @@ def calculate_segment_metrics(row, world_ports_data):
         total_time = sea_time + row[2]  # port days
         
         # Calculate CO2 emissions based on fuel type
-        co2_emissions = row[4] * EMISSION_FACTORS[row[5]]  # fuel used * emission factor
+        co2_emissions = row[4] * sea_time * EMISSION_FACTORS[row[5]]  # fuel used * emission factor
         
         return {
             'from_port': row[0],
