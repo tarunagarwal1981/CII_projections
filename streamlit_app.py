@@ -32,21 +32,29 @@ st.set_page_config(page_title="CII Calculator", layout="wide", page_icon="🚢")
 st.markdown("""
     <style>
     .stApp {
-        max-width: 1200px;
+        max-width: 1400px;
         margin: 0 auto;
+        background-color: #132337;
+        font-family: 'Nunito', sans-serif;
+        color: #E0EFE9;
+        font-size: 14px;
     }
     .stButton > button {
         background-color: #4CAF50;
         color: white;
+        font-family: 'Nunito', sans-serif;
+        font-size: 14px;
     }
     .metric-card {
         background-color: #f8f9fa;
         padding: 1rem;
         border-radius: 0.5rem;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        color: #132337;
     }
     </style>
-    """, unsafe_allow_html=True)
+""")
+
 
 # Initialize session state
 if 'cii_data' not in st.session_state:
