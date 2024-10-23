@@ -43,7 +43,7 @@ st.markdown("""
 
 /* Ensure text color applies to all text elements */
 .stApp p, .stApp div, .stApp label, .stApp span {
-    color: #E0EFE9;
+    color: #F4F4F4;
 }
 
 .stButton > button {
