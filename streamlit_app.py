@@ -28,102 +28,25 @@ EMISSION_FACTORS = {
 # Streamlit page config
 st.set_page_config(page_title="CII Calculator", layout="wide", page_icon="🚢")
 
+# Apply custom CSS
 st.markdown("""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap');
-
-/* Main app styling */
-.stApp {
-    max-width: 1400px;
-    margin: 0 auto;
-    background-color: #132337 !important;
-    font-family: 'Nunito', sans-serif !important;
-    font-size: 14px;
-}
-
-/* Override Streamlit's default background */
-section[data-testid="stSidebar"] {
-    background-color: #132337 !important;
-}
-
-/* Headers and titles */
-h1, h2, h3, h4, h5, h6, .css-10trblm {
-    color: #6B7280 !important;
-    font-family: 'Nunito', sans-serif !important;
-    font-weight: 600 !important;
-}
-
-/* Title specific styling */
-.css-10trblm {
-    font-size: 2rem !important;
-    font-weight: 600 !important;
-    color: #6B7280 !important;
-}
-
-/* Input fields */
-.stTextInput input, .stNumberInput input, .stDateInput input {
-    background-color: white !important;
-    color: #1F2937 !important;
-    border-radius: 4px !important;
-    border: 1px solid #E5E7EB !important;
-}
-
-/* Labels */
-.css-9ycgxx {
-    color: #9CA3AF !important;
-    font-family: 'Nunito', sans-serif !important;
-}
-
-/* Text elements */
-.css-zt5igj p, .css-zt5igj span, .css-zt5igj div, .css-zt5igj label {
-    color: #9CA3AF !important;
-    font-family: 'Nunito', sans-serif !important;
-}
-
-/* Button styling */
-.stButton > button {
-    background-color: #4CAF50 !important;
-    color: white !important;
-    font-family: 'Nunito', sans-serif !important;
-    border: none !important;
-    padding: 0.5rem 1rem !important;
-    border-radius: 4px !important;
-    cursor: pointer !important;
-}
-
-/* Table headers */
-.stTable th {
-    background-color: #1F2937 !important;
-    color: #F9FAFB !important;
-    font-family: 'Nunito', sans-serif !important;
-}
-
-/* Table cells */
-.stTable td {
-    color: #9CA3AF !important;
-    font-family: 'Nunito', sans-serif !important;
-}
-
-/* Data editor (if you're using st.data_editor) */
-[data-testid="stDataEditor"] {
-    background-color: white !important;
-    font-family: 'Nunito', sans-serif !important;
-}
-
-/* Make sure all text inputs and selects have white background */
-.stSelectbox select, .stMultiSelect select {
-    background-color: white !important;
-    color: #1F2937 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Example usage:
-st.title("CII Calculator")
-st.text_input("Enter Vessel Name")
-st.selectbox("Year for CII Calculation", ["2024"])
-st.button("Calculate Current CII")
-
+    <style>
+    .stApp {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .stButton > button {
+        background-color: #4CAF50;
+        color: white;
+    }
+    .metric-card {
+        background-color: #f8f9fa;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # Initialize session state
 if 'cii_data' not in st.session_state:
