@@ -32,43 +32,59 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap');
 
+/* Main app styling */
 .stApp {
     max-width: 1400px;
     margin: 0 auto;
     background-color: #132337;
-    font-family: 'Nunito', sans-serif;
-    font-size: 12px;
+    font-family: 'Nunito', sans-serif !important;
+    font-size: 14px;
     color: #F4F4F4;
 }
 
-/* Ensure text color applies to all text elements */
-.stApp p, .stApp div, .stApp label, .stApp span {
-    color: #F4F4F4;
-}
-
-/* Style for st.title */
-.css-10trblm {
-    font-family: 'Nunito', sans-serif;
+/* Title styling */
+.css-1629pvs, .css-10trblm, .css-zt5igj h1, .css-zt5igj h2, .css-zt5igj h3, .css-zt5igj h4 {
+    font-family: 'Nunito', sans-serif !important;
     color: #F4F4F4 !important;
-    font-weight: 600;
+    font-weight: 600 !important;
 }
 
-/* Style for st.header */
-.css-1629p8f h1 {
-    font-family: 'Nunito', sans-serif;
+/* Text elements styling */
+.css-zt5igj p, .css-zt5igj span, .css-zt5igj div, .css-zt5igj label, 
+.css-zt5igj li, .css-zt5igj code, .css-zt5igj text {
+    font-family: 'Nunito', sans-serif !important;
     color: #F4F4F4 !important;
 }
 
+/* Markdown text styling */
+.css-zt5igj {
+    font-family: 'Nunito', sans-serif !important;
+    color: #F4F4F4 !important;
+}
+
+/* Sidebar styling */
+.css-1d391kg {
+    font-family: 'Nunito', sans-serif !important;
+}
+
+.css-1d391kg .stMarkdown {
+    color: #F4F4F4 !important;
+}
+
+/* Button styling */
 .stButton > button {
     background-color: #4CAF50;
     color: white;
+    font-family: 'Nunito', sans-serif !important;
 }
 
+/* Metric card styling */
 .metric-card {
     background-color: #f8f9fa;
     padding: 1rem;
     border-radius: 0.5rem;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    font-family: 'Nunito', sans-serif !important;
 }
 </style>
 """, unsafe_allow_html=True)
