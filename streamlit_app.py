@@ -28,32 +28,37 @@ EMISSION_FACTORS = {
 # Streamlit page config
 st.set_page_config(page_title="CII Calculator", layout="wide", page_icon="🚢")
 
-# Apply custom CSS
 st.markdown("""
-    <style>
-    .stApp {
-        max-width: 1400px;
-        margin: 0 auto;
-        background-color: #132337;
-        font-family: 'Nunito', sans-serif;
-        color: #E0EFE9;
-        font-size: 14px;
-    }
-    .stButton > button {
-        background-color: #4CAF50;
-        color: white;
-        font-family: 'Nunito', sans-serif;
-        font-size: 14px;
-    }
-    .metric-card {
-        background-color: #f8f9fa;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        color: #132337;
-    }
-    </style>
-""")
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600&display=swap');
+
+.stApp {
+    max-width: 1400px;
+    margin: 0 auto;
+    background-color: #132337;
+    font-family: 'Nunito', sans-serif;
+    font-size: 14px;
+    color: #E0EFE9;
+}
+
+/* Ensure text color applies to all text elements */
+.stApp p, .stApp div, .stApp label, .stApp span {
+    color: #E0EFE9;
+}
+
+.stButton > button {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.metric-card {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+</style>
+""", unsafe_allow_html=True)
 
 
 # Initialize session state
