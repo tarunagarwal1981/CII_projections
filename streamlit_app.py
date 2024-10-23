@@ -36,58 +36,93 @@ st.markdown("""
 .stApp {
     max-width: 1400px;
     margin: 0 auto;
-    background-color: #132337;
+    background-color: #132337 !important;
     font-family: 'Nunito', sans-serif !important;
     font-size: 14px;
-    color: #F4F4F4;
 }
 
-/* Title styling */
-.css-1629pvs, .css-10trblm, .css-zt5igj h1, .css-zt5igj h2, .css-zt5igj h3, .css-zt5igj h4 {
+/* Override Streamlit's default background */
+section[data-testid="stSidebar"] {
+    background-color: #132337 !important;
+}
+
+/* Headers and titles */
+h1, h2, h3, h4, h5, h6, .css-10trblm {
+    color: #6B7280 !important;
     font-family: 'Nunito', sans-serif !important;
-    color: #F4F4F4 !important;
     font-weight: 600 !important;
 }
 
-/* Text elements styling */
-.css-zt5igj p, .css-zt5igj span, .css-zt5igj div, .css-zt5igj label, 
-.css-zt5igj li, .css-zt5igj code, .css-zt5igj text {
-    font-family: 'Nunito', sans-serif !important;
-    color: #F4F4F4 !important;
+/* Title specific styling */
+.css-10trblm {
+    font-size: 2rem !important;
+    font-weight: 600 !important;
+    color: #6B7280 !important;
 }
 
-/* Markdown text styling */
-.css-zt5igj {
-    font-family: 'Nunito', sans-serif !important;
-    color: #F4F4F4 !important;
+/* Input fields */
+.stTextInput input, .stNumberInput input, .stDateInput input {
+    background-color: white !important;
+    color: #1F2937 !important;
+    border-radius: 4px !important;
+    border: 1px solid #E5E7EB !important;
 }
 
-/* Sidebar styling */
-.css-1d391kg {
+/* Labels */
+.css-9ycgxx {
+    color: #9CA3AF !important;
     font-family: 'Nunito', sans-serif !important;
 }
 
-.css-1d391kg .stMarkdown {
-    color: #F4F4F4 !important;
+/* Text elements */
+.css-zt5igj p, .css-zt5igj span, .css-zt5igj div, .css-zt5igj label {
+    color: #9CA3AF !important;
+    font-family: 'Nunito', sans-serif !important;
 }
 
 /* Button styling */
 .stButton > button {
-    background-color: #4CAF50;
-    color: white;
+    background-color: #4CAF50 !important;
+    color: white !important;
+    font-family: 'Nunito', sans-serif !important;
+    border: none !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 4px !important;
+    cursor: pointer !important;
+}
+
+/* Table headers */
+.stTable th {
+    background-color: #1F2937 !important;
+    color: #F9FAFB !important;
     font-family: 'Nunito', sans-serif !important;
 }
 
-/* Metric card styling */
-.metric-card {
-    background-color: #f8f9fa;
-    padding: 1rem;
-    border-radius: 0.5rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+/* Table cells */
+.stTable td {
+    color: #9CA3AF !important;
     font-family: 'Nunito', sans-serif !important;
+}
+
+/* Data editor (if you're using st.data_editor) */
+[data-testid="stDataEditor"] {
+    background-color: white !important;
+    font-family: 'Nunito', sans-serif !important;
+}
+
+/* Make sure all text inputs and selects have white background */
+.stSelectbox select, .stMultiSelect select {
+    background-color: white !important;
+    color: #1F2937 !important;
 }
 </style>
 """, unsafe_allow_html=True)
+
+# Example usage:
+st.title("CII Calculator")
+st.text_input("Enter Vessel Name")
+st.selectbox("Year for CII Calculation", ["2024"])
+st.button("Calculate Current CII")
 
 
 # Initialize session state
