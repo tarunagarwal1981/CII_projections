@@ -37,13 +37,26 @@ st.markdown("""
     margin: 0 auto;
     background-color: #132337;
     font-family: 'Nunito', sans-serif;
-    font-size: 14px;
-    color: #E0EFE9;
+    font-size: 12px;
+    color: #F4F4F4;
 }
 
 /* Ensure text color applies to all text elements */
 .stApp p, .stApp div, .stApp label, .stApp span {
     color: #F4F4F4;
+}
+
+/* Style for st.title */
+.css-10trblm {
+    font-family: 'Nunito', sans-serif;
+    color: #F4F4F4 !important;
+    font-weight: 600;
+}
+
+/* Style for st.header */
+.css-1629p8f h1 {
+    font-family: 'Nunito', sans-serif;
+    color: #F4F4F4 !important;
 }
 
 .stButton > button {
